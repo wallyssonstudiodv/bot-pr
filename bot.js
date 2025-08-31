@@ -1,27 +1,18 @@
-const { 
-    default: makeWASocket, 
-    DisconnectReason, 
-    useMultiFileAuthState,
-    fetchLatestBaileysVersion,
-    Browsers,
-    MessageType
-} = require('@whiskeysockets/baileys');
-const P = require('pino');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
 const readline = require('readline');
 const fs = require('fs');
-const path = require('path');
 const cron = require('node-cron');
 const axios = require('axios');
 const chalk = require('chalk');
 
 class YouTubeWhatsAppBot {
     constructor() {
-        this.sock = null;
-        this.qr = null;
+        this.client = null;
+        this.isConnected = false;
+        this.isConnecting = false;
         this.groups = new Map();
         this.schedules = new Map();
-        this.isConnected = false;
-        this.isConnecting = false; // Novo flag para controlar conexão
         this.youtubeApiKey = "AIzaSyDubEpb0TkgZjiyjA9-1QM_56Kwnn_SMPs";
         this.channelId = "UCh-ceOeY4WVgS8R0onTaXmw";
         this.dataFile = './bot_data.json';
@@ -35,6 +26,75 @@ class YouTubeWhatsAppBot {
 
         this.loadData();
         this.setupCommands();
+        this.initializeClient();
+    }
+
+    // Inicializa o cliente WhatsApp
+    initializeClient() {
+        this.client = new Client({
+            authStrategy: new LocalAuth({
+                clientId: "youtube-bot"
+            }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu'
+                ]
+            }
+        });
+
+        this.setupClientEvents();
+    }
+
+    // Configura eventos do cliente
+    setupClientEvents() {
+        this.client.on('qr', (qr) => {
+            console.log(chalk.yellow('📱 QR Code gerado! Escaneie com seu WhatsApp:'));
+            qrcode.generate(qr, { small: true });
+        });
+
+        this.client.on('ready', async () => {
+            this.isConnected = true;
+            this.isConnecting = false;
+            console.log(chalk.green('✅ Cliente WhatsApp conectado e pronto!'));
+            await this.loadGroups();
+        });
+
+        this.client.on('authenticated', () => {
+            console.log(chalk.blue('🔐 Cliente autenticado!'));
+        });
+
+        this.client.on('auth_failure', (msg) => {
+            this.isConnecting = false;
+            console.log(chalk.red('❌ Falha na autenticação:'), msg);
+        });
+
+        this.client.on('disconnected', (reason) => {
+            this.isConnected = false;
+            this.isConnecting = false;
+            console.log(chalk.red('❌ Cliente desconectado:'), reason);
+        });
+
+        this.client.on('message_create', async (message) => {
+            // Opcional: responder a comandos diretos
+            if (message.fromMe) return;
+            
+            if (message.body === '!status' && message.from.includes('@g.us')) {
+                const chat = await message.getChat();
+                if (chat.isGroup) {
+                    const groupInfo = this.groups.get(chat.id._serialized);
+                    const status = groupInfo?.active ? '🟢 ATIVO' : '🔴 INATIVO';
+                    message.reply(`Bot Status: ${status}\nGrupo: ${chat.name}`);
+                }
+            }
+        });
     }
 
     // Carrega dados salvos
@@ -44,6 +104,12 @@ class YouTubeWhatsAppBot {
                 const data = JSON.parse(fs.readFileSync(this.dataFile, 'utf8'));
                 this.schedules = new Map(data.schedules || []);
                 this.lastVideoId = data.lastVideoId || null;
+                
+                // Recriar os cron jobs
+                for (const [id, scheduleData] of this.schedules) {
+                    this.recreateSchedule(id, scheduleData);
+                }
+                
                 console.log(chalk.green('📊 Dados carregados com sucesso!'));
             }
         } catch (error) {
@@ -51,16 +117,93 @@ class YouTubeWhatsAppBot {
         }
     }
 
+    // Recria agendamento após carregar dados
+    recreateSchedule(id, scheduleData) {
+        try {
+            const task = cron.schedule(scheduleData.cron, () => {
+                console.log(chalk.blue('⏰ Executando verificação agendada...'));
+                this.checkAndSendNewVideos();
+            }, {
+                scheduled: false
+            });
+
+            this.schedules.set(id, {
+                ...scheduleData,
+                task: task
+            });
+
+            task.start();
+        } catch (error) {
+            console.log(chalk.red(`❌ Erro ao recriar agendamento ${id}:`, error.message));
+            this.schedules.delete(id);
+        }
+    }
+
     // Salva dados
     saveData() {
         try {
+            const schedulesToSave = new Map();
+            for (const [id, schedule] of this.schedules) {
+                schedulesToSave.set(id, {
+                    cron: schedule.cron,
+                    created: schedule.created
+                });
+            }
+
             const data = {
-                schedules: Array.from(this.schedules),
+                schedules: Array.from(schedulesToSave),
                 lastVideoId: this.lastVideoId
             };
             fs.writeFileSync(this.dataFile, JSON.stringify(data, null, 2));
         } catch (error) {
             console.log(chalk.red('⚠️ Erro ao salvar dados:'), error.message);
+        }
+    }
+
+    // Conecta ao WhatsApp
+    async connect() {
+        if (this.isConnected) {
+            console.log(chalk.green('✅ Já está conectado!'));
+            return;
+        }
+
+        if (this.isConnecting) {
+            console.log(chalk.yellow('⏳ Já está conectando, aguarde...'));
+            return;
+        }
+
+        this.isConnecting = true;
+        console.log(chalk.blue('🔗 Iniciando conexão...'));
+
+        try {
+            await this.client.initialize();
+        } catch (error) {
+            this.isConnecting = false;
+            console.log(chalk.red('❌ Erro ao conectar:'), error.message);
+        }
+    }
+
+    // Carrega grupos
+    async loadGroups() {
+        try {
+            const chats = await this.client.getChats();
+            this.groups.clear();
+            
+            let groupCount = 0;
+            for (const chat of chats) {
+                if (chat.isGroup) {
+                    this.groups.set(chat.id._serialized, {
+                        name: chat.name,
+                        active: false,
+                        chat: chat
+                    });
+                    groupCount++;
+                }
+            }
+            
+            console.log(chalk.green(`📋 ${groupCount} grupos carregados!`));
+        } catch (error) {
+            console.log(chalk.red('❌ Erro ao carregar grupos:'), error.message);
         }
     }
 
@@ -77,16 +220,11 @@ class YouTubeWhatsAppBot {
                 const thumbnail = video.snippet.thumbnails.high.url;
                 const link = `https://www.youtube.com/watch?v=${videoId}`;
 
-                // Baixa a thumbnail
-                const imgResponse = await axios.get(thumbnail, { responseType: 'arraybuffer' });
-                const base64 = Buffer.from(imgResponse.data).toString('base64');
-
                 return {
                     videoId,
                     title,
                     thumbnail,
                     link,
-                    base64,
                     isNew: videoId !== this.lastVideoId
                 };
             }
@@ -99,23 +237,31 @@ class YouTubeWhatsAppBot {
 
     // Envia mensagem com vídeo para um grupo
     async sendVideoToGroup(groupId, videoData) {
-        if (!this.sock || !this.isConnected) {
+        if (!this.client || !this.isConnected) {
             console.log(chalk.red('❌ Bot não conectado!'));
             return false;
         }
 
         try {
+            const group = this.groups.get(groupId);
+            if (!group) {
+                console.log(chalk.red(`❌ Grupo ${groupId} não encontrado!`));
+                return false;
+            }
+
             const message = `🚨 Saiu vídeo novo no canal!\n\n🎬 *${videoData.title}*\n👉 Assista agora: ${videoData.link}\n\nCompartilhe com a família e amigos 🙏 Jesus abençoe!`;
             
             // Envia a mensagem de texto
-            await this.sock.sendMessage(groupId, { text: message });
+            await this.client.sendMessage(groupId, message);
             
-            // Envia a imagem com legenda
-            const imageBuffer = Buffer.from(videoData.base64, 'base64');
-            await this.sock.sendMessage(groupId, {
-                image: imageBuffer,
-                caption: `🆕 ${videoData.title}\n🎥 Assista: ${videoData.link}`
-            });
+            // Baixa e envia a imagem
+            try {
+                const media = await MessageMedia.fromUrl(videoData.thumbnail);
+                const caption = `🆕 ${videoData.title}\n🎥 Assista: ${videoData.link}`;
+                await this.client.sendMessage(groupId, media, { caption: caption });
+            } catch (mediaError) {
+                console.log(chalk.yellow(`⚠️ Erro ao enviar imagem para ${group.name}:`, mediaError.message));
+            }
 
             return true;
         } catch (error) {
@@ -126,6 +272,11 @@ class YouTubeWhatsAppBot {
 
     // Verifica novos vídeos e envia
     async checkAndSendNewVideos() {
+        if (!this.isConnected) {
+            console.log(chalk.red('❌ Bot não conectado!'));
+            return;
+        }
+
         console.log(chalk.blue('🔍 Verificando novos vídeos...'));
         
         const videoData = await this.getLatestVideo();
@@ -140,13 +291,17 @@ class YouTubeWhatsAppBot {
             this.saveData();
 
             // Envia para todos os grupos ativos
+            let sentCount = 0;
             for (const [groupId, groupData] of this.groups) {
                 if (groupData.active) {
                     console.log(chalk.blue(`📤 Enviando para: ${groupData.name}`));
-                    await this.sendVideoToGroup(groupId, videoData);
-                    await this.delay(2000); // Delay entre envios
+                    const success = await this.sendVideoToGroup(groupId, videoData);
+                    if (success) sentCount++;
+                    await this.delay(3000); // Delay de 3 segundos entre envios
                 }
             }
+            
+            console.log(chalk.green(`✅ Vídeo enviado para ${sentCount} grupos!`));
         } else {
             console.log(chalk.gray('📺 Nenhum vídeo novo encontrado'));
         }
@@ -155,102 +310,6 @@ class YouTubeWhatsAppBot {
     // Delay helper
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    // Conecta ao WhatsApp
-    async connectToWhatsApp() {
-        if (this.isConnecting) {
-            console.log(chalk.yellow('⏳ Já está conectando, aguarde...'));
-            return;
-        }
-
-        this.isConnecting = true;
-
-        try {
-            const { state, saveCreds } = await useMultiFileAuthState('./auth');
-            const { version } = await fetchLatestBaileysVersion();
-
-            this.sock = makeWASocket({
-                version,
-                logger: P({ level: 'silent' }),
-                printQRInTerminal: false,
-                browser: Browsers.macOS('Desktop'),
-                auth: state,
-                connectTimeoutMs: 60000,
-                defaultQueryTimeoutMs: 0,
-                keepAliveIntervalMs: 10000,
-                generateHighQualityLinkPreview: true,
-                syncFullHistory: false,
-                markOnlineOnConnect: true
-            });
-
-            this.sock.ev.on('connection.update', async (update) => {
-                const { connection, lastDisconnect, qr } = update;
-
-                if (qr) {
-                    this.qr = qr;
-                    console.log(chalk.yellow('📱 QR Code gerado! Use o comando "qr" para visualizar.'));
-                }
-
-                if (connection === 'close') {
-                    this.isConnected = false;
-                    this.isConnecting = false;
-                    
-                    const statusCode = lastDisconnect?.error?.output?.statusCode;
-                    const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                    
-                    console.log(chalk.red('❌ Conexão fechada.'));
-                    console.log(chalk.gray(`Código: ${statusCode}, Reconectar: ${shouldReconnect}`));
-                    
-                    if (shouldReconnect) {
-                        console.log(chalk.yellow('🔄 Tentando reconectar em 5 segundos...'));
-                        setTimeout(() => {
-                            this.connectToWhatsApp();
-                        }, 5000);
-                    } else {
-                        console.log(chalk.red('🚪 Desconectado permanentemente. Use "connect" para reconectar.'));
-                    }
-                } else if (connection === 'open') {
-                    this.isConnecting = false;
-                    this.isConnected = true;
-                    console.log(chalk.green('✅ Conectado ao WhatsApp!'));
-                    await this.loadGroups();
-                } else if (connection === 'connecting') {
-                    console.log(chalk.blue('🔗 Conectando...'));
-                }
-            });
-
-            this.sock.ev.on('creds.update', saveCreds);
-
-        } catch (error) {
-            this.isConnecting = false;
-            console.log(chalk.red('❌ Erro na conexão:'), error.message);
-            
-            // Tentar reconectar após erro
-            setTimeout(() => {
-                console.log(chalk.yellow('🔄 Tentando reconectar após erro...'));
-                this.connectToWhatsApp();
-            }, 10000);
-        }
-    }
-
-    // Carrega grupos
-    async loadGroups() {
-        try {
-            const groups = await this.sock.groupFetchAllParticipating();
-            this.groups.clear();
-            
-            for (const [id, group] of Object.entries(groups)) {
-                this.groups.set(id, {
-                    name: group.subject,
-                    active: false
-                });
-            }
-            
-            console.log(chalk.green(`📋 ${this.groups.size} grupos carregados!`));
-        } catch (error) {
-            console.log(chalk.red('❌ Erro ao carregar grupos:'), error.message);
-        }
     }
 
     // Configura comandos do terminal
@@ -266,22 +325,13 @@ class YouTubeWhatsAppBot {
                     this.showHelp();
                     break;
                 case 'connect':
-                    if (this.isConnected) {
-                        console.log(chalk.green('✅ Já está conectado!'));
-                    } else if (this.isConnecting) {
-                        console.log(chalk.yellow('⏳ Já está conectando, aguarde...'));
-                    } else {
-                        await this.connectToWhatsApp();
-                    }
+                    await this.connect();
                     break;
                 case 'disconnect':
                     this.disconnect();
                     break;
                 case 'restart':
                     await this.restart();
-                    break;
-                case 'qr':
-                    this.showQR();
                     break;
                 case 'status':
                     this.showStatus();
@@ -310,6 +360,9 @@ class YouTubeWhatsAppBot {
                 case 'send':
                     await this.checkAndSendNewVideos();
                     break;
+                case 'clean':
+                    this.cleanSession();
+                    break;
                 case 'clear':
                     console.clear();
                     break;
@@ -332,35 +385,25 @@ class YouTubeWhatsAppBot {
         console.log(chalk.white('connect         - Conecta ao WhatsApp'));
         console.log(chalk.white('disconnect      - Desconecta do WhatsApp'));
         console.log(chalk.white('restart         - Reinicia a conexão'));
-        console.log(chalk.white('qr              - Mostra o QR Code'));
         console.log(chalk.white('status          - Status da conexão'));
         console.log(chalk.white('groups          - Lista todos os grupos'));
         console.log(chalk.white('activate <nome> - Ativa grupo para envios'));
         console.log(chalk.white('deactivate <nome> - Desativa grupo'));
-        console.log(chalk.white('schedule <cron> - Agenda verificação (ex: 0 9,18 * * *)'));
+        console.log(chalk.white('schedule <cron> - Agenda verificação (ex: "0 9,18 * * *")'));
         console.log(chalk.white('schedules       - Lista agendamentos'));
         console.log(chalk.white('remove <id>     - Remove agendamento'));
         console.log(chalk.white('test            - Testa busca de vídeo'));
         console.log(chalk.white('send            - Verifica e envia vídeos novos'));
+        console.log(chalk.white('clean           - Limpa sessão do WhatsApp'));
         console.log(chalk.white('clear           - Limpa a tela'));
         console.log(chalk.white('exit            - Sair do bot\n'));
-    }
-
-    // Mostra QR Code
-    showQR() {
-        if (this.qr) {
-            console.log(chalk.yellow('📱 Escaneie este QR Code:'));
-            const qrcode = require('qrcode-terminal');
-            qrcode.generate(this.qr, { small: true });
-        } else {
-            console.log(chalk.red('❌ Nenhum QR Code disponível.'));
-        }
     }
 
     // Mostra status
     showStatus() {
         console.log(chalk.cyan('\n📊 STATUS DO BOT:'));
         console.log(chalk.white(`Conexão: ${this.isConnected ? chalk.green('✅ Conectado') : chalk.red('❌ Desconectado')}`));
+        console.log(chalk.white(`Conectando: ${this.isConnecting ? chalk.yellow('⏳ Sim') : chalk.gray('Não')}`));
         console.log(chalk.white(`Grupos: ${this.groups.size}`));
         console.log(chalk.white(`Grupos Ativos: ${Array.from(this.groups.values()).filter(g => g.active).length}`));
         console.log(chalk.white(`Agendamentos: ${this.schedules.size}`));
@@ -370,6 +413,11 @@ class YouTubeWhatsAppBot {
     // Lista grupos
     listGroups() {
         console.log(chalk.cyan('\n📋 GRUPOS DISPONÍVEIS:'));
+        if (this.groups.size === 0) {
+            console.log(chalk.gray('Nenhum grupo carregado. Conecte primeiro com "connect".'));
+            return;
+        }
+
         let index = 1;
         for (const [id, group] of this.groups) {
             const status = group.active ? chalk.green('🟢 ATIVO') : chalk.red('🔴 INATIVO');
@@ -381,6 +429,11 @@ class YouTubeWhatsAppBot {
 
     // Ativa grupo
     activateGroup(groupName) {
+        if (!groupName) {
+            console.log(chalk.yellow('❌ Informe o nome do grupo.'));
+            return;
+        }
+
         const group = Array.from(this.groups.entries()).find(([id, data]) => 
             data.name.toLowerCase().includes(groupName.toLowerCase())
         );
@@ -388,6 +441,7 @@ class YouTubeWhatsAppBot {
         if (group) {
             group[1].active = true;
             console.log(chalk.green(`✅ Grupo "${group[1].name}" ativado!`));
+            this.saveData();
         } else {
             console.log(chalk.red('❌ Grupo não encontrado!'));
         }
@@ -395,6 +449,11 @@ class YouTubeWhatsAppBot {
 
     // Desativa grupo
     deactivateGroup(groupName) {
+        if (!groupName) {
+            console.log(chalk.yellow('❌ Informe o nome do grupo.'));
+            return;
+        }
+
         const group = Array.from(this.groups.entries()).find(([id, data]) => 
             data.name.toLowerCase().includes(groupName.toLowerCase())
         );
@@ -402,6 +461,7 @@ class YouTubeWhatsAppBot {
         if (group) {
             group[1].active = false;
             console.log(chalk.yellow(`🔴 Grupo "${group[1].name}" desativado!`));
+            this.saveData();
         } else {
             console.log(chalk.red('❌ Grupo não encontrado!'));
         }
@@ -410,8 +470,11 @@ class YouTubeWhatsAppBot {
     // Agenda mensagens
     scheduleMessage(args) {
         if (args.length === 0) {
-            console.log(chalk.yellow('📅 Formato: schedule <cron_expression>'));
-            console.log(chalk.gray('Exemplo: schedule "0 9,18 * * *" (às 9h e 18h todos os dias)'));
+            console.log(chalk.yellow('📅 Formato: schedule "<cron_expression>"'));
+            console.log(chalk.gray('Exemplos:'));
+            console.log(chalk.gray('  schedule "0 9,18 * * *"    # 9h e 18h todos os dias'));
+            console.log(chalk.gray('  schedule "*/30 * * * *"    # A cada 30 minutos'));
+            console.log(chalk.gray('  schedule "0 8 * * 1-5"     # 8h de segunda a sexta'));
             return;
         }
 
@@ -489,20 +552,29 @@ class YouTubeWhatsAppBot {
         }
     }
 
-    // Mostra prompt
-    showPrompt() {
-        process.stdout.write(chalk.cyan('\n🤖 Bot> '));
+    // Limpa sessão
+    cleanSession() {
+        console.log(chalk.yellow('🧹 Limpando sessão...'));
+        if (this.client) {
+            this.disconnect();
+        }
+        
+        const sessionDir = './.wwebjs_auth';
+        if (fs.existsSync(sessionDir)) {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+            console.log(chalk.green('✅ Sessão limpa! Use "connect" para reconectar.'));
+        } else {
+            console.log(chalk.gray('Nenhuma sessão encontrada.'));
+        }
     }
 
     // Desconecta
     disconnect() {
-        if (this.sock) {
-            this.sock.end();
-            this.sock = null;
+        if (this.client) {
+            this.client.destroy();
         }
         this.isConnected = false;
         this.isConnecting = false;
-        this.qr = null;
         console.log(chalk.yellow('🚪 Desconectado do WhatsApp'));
     }
 
@@ -510,8 +582,14 @@ class YouTubeWhatsAppBot {
     async restart() {
         console.log(chalk.blue('🔄 Reiniciando conexão...'));
         this.disconnect();
-        await this.delay(2000);
-        await this.connectToWhatsApp();
+        await this.delay(3000);
+        this.initializeClient();
+        await this.connect();
+    }
+
+    // Mostra prompt
+    showPrompt() {
+        process.stdout.write(chalk.cyan('\n🤖 Bot> '));
     }
 
     // Sair
@@ -532,9 +610,12 @@ class YouTubeWhatsAppBot {
 }
 
 // Inicia o bot
+console.log(chalk.green('🚀 Iniciando Bot YouTube WhatsApp com whatsapp-web.js...'));
 const bot = new YouTubeWhatsAppBot();
 
-// Não conecta automaticamente - usuário deve usar comando "connect"
-console.log(chalk.green('🤖 Bot iniciado! Digite "connect" para conectar ao WhatsApp.'));
+// Captura Ctrl+C para sair graciosamente
+process.on('SIGINT', () => {
+    bot.exit();
+});
 
 module.exports = YouTubeWhatsAppBot;
