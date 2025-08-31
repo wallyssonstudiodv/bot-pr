@@ -278,19 +278,11 @@ class YouTubeWhatsAppBot {
                 return false;
             }
 
-            const message = `🚨 *VÍDEO NOVO DO PR MARCELO OLIVEIRA!*\n\n🎬 *${videoData.title}*\n\n👉 *Assista agora:* ${videoData.link}\n\n🙏 Compartilhe com família e amigos!\n\n✨ *Deus abençoe!*\n\n━━━━━━━━━━━━━━━━━━\n🤖 Disparador by Wallysson Studio DV 2025`;
+            const message = `🚨 *VÍDEO NOVO DO PR MARCELO OLIVEIRA!*\n\n🎬 *${videoData.title}*\n\n👉 *Assista agora:* ${videoData.link}\n\n🙏 Compartilhe com família e amigos!\n\n✨ *Deus abençoe!*\n\n━━━━━━━━━━━━━━━━━━\n`;
             
             // Envia a mensagem de texto
             await this.client.sendMessage(groupId, message);
             
-            // Tenta enviar a thumbnail
-            try {
-                const media = await MessageMedia.fromUrl(videoData.thumbnail);
-                const caption = `🆕 *${videoData.title}*\n\n🎥 *Link:* ${videoData.link}\n\n✨ Wallysson Studio DV 2025`;
-                await this.client.sendMessage(groupId, media, { caption: caption });
-            } catch (mediaError) {
-                console.log(chalk.yellow(`⚠️ Erro ao enviar imagem para ${group.name}`));
-            }
 
             return true;
         } catch (error) {
