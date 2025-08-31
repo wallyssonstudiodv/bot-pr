@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Disparador Canal PR Marcelo Oliveira - Wallysson Studio DV</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .status-item i {
+            font-size: 1.5em;
+            margin-right: 15px;
+            width: 25px;
+        }
+
+        .status-connected { color: #4CAF50; }
+        .status-connecting { color: #FF9800; }
+        .status-disconnected { color: #f44336; }
+        .status-active { color: #2196F3; }
+        .status-inactive { color: #9E9E9E; }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .control-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .section-title {
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+            color: #555;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #FF9800, #F57C00);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .qr-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .qr-code {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .qr-code img {
+            max-width: 250px;
+            height: auto;
+        }
+
+        .log-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-container {
+            flex: 1;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            border: 1px solid #e0e0e0;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border-left: 4px solid;
+            word-wrap: break-word;
+        }
+
+        .log-success {
+            background: #f1f8e9;
+            border-left-color: #4CAF50;
+            color: #2e7d32;
+        }
+
+        .log-error {
+            background: #ffebee;
+            border-left-color: #f44336;
+            color: #c62828;
+        }
+
+        .log-warning {
+            background: #fff8e1;
+            border-left-color: #FF9800;
+            color: #ef6c00;
+        }
+
+        .log-info {
+            background: #e3f2fd;
+            border-left-color: #2196F3;
+            color: #1565c0;
+        }
+
+        .groups-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .groups-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .group-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
+        .group-item:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .group-name {
+            flex: 1;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .group-status {
+            margin: 0 15px;
+            font-size: 0.9em;
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-weight: 500;
+        }
+
+        .group-active {
+            background: #e8f5e8;
+            color: #4CAF50;
+        }
+
+        .group-inactive {
+            background: #ffebee;
+            color: #f44336;
+        }
+
+        .group-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.8em;
+            border-radius: 6px;
+        }
+
+        .schedules-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .schedule-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .schedule-input input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .schedule-input input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .schedule-examples {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .schedule-examples h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .schedule-examples ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .schedule-examples li {
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .schedule-examples li:last-child {
+            border-bottom: none;
+        }
+
+        .schedule-list {
+            margin-top: 15px;
+        }
+
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+
+        .schedule-info {
+            flex: 1;
+        }
+
+        .schedule-cron {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #2196F3;
+        }
+
+        .schedule-desc {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .video-info {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .video-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .video-link {
+            color: #2196F3;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .video-link:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-bar {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .control-section, .qr-section, .log-section, .groups-section, .schedules-section {
+                padding: 15px;
+            }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            z-index: 2000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification-success {
+            background: #4CAF50;
+        }
+
+        .notification-error {
+            background: #f44336;
+        }
+
+        .notification-warning {
+            background: #FF9800;
+        }
+
+        .notification-info {
+            background: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-rocket"></i> Disparador Canal PR Marcelo Oliveira</h1>
+            <p>Criado por <strong>WALLYSSON STUDIO DV 2025</strong> - Automatize o envio de novos vídeos para WhatsApp!</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-card">
+                <h3>Status da Conexão</h3>
+                <div class="status-item">
+                    <i id="connection-icon" class="fas fa-circle status-disconnected"></i>
+                    <span id="connection-status">Desconectado</span>
+                </div>
+                <div class="status-item">
+                    <i id="auto-icon" class="fas fa-clock status-inactive"></i>
+                    <span id="auto-status">Envio Automático: Inativo</span>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3>Estatísticas</h3>
+                <div class="status-item">
+                    <i class="fas fa-users" style="color: #2196F3;"></i>
+                    <span>Total de Grupos: <strong id="total-groups">0</strong></span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-check-circle" style="color: #4CAF50;"></i>
+                    <span>Grupos Ativos: <strong id="active-groups">0</strong></span>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3>Último Vídeo</h3>
+                <div class="status-item">
+                    <i class="fas fa-video" style="color: #FF9800;"></i>
+                    <span id="last-video">Nenhum vídeo processado</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="left-panel">
+                <div class="control-section">
+                    <h2 class="section-title"><i class="fas fa-cog"></i> Controles Principais</h2>
+                    
+                    <div class="button-group">
+                        <button id="btn-connect" class="btn btn-primary">
+                            <i class="fas fa-plug"></i> Conectar WhatsApp
+                        </button>
+                        <button id="btn-disconnect" class="btn btn-danger" disabled>
+                            <i class="fas fa-times"></i> Desconectar
+                        </button>
+                        <button id="btn-check-videos" class="btn btn-secondary" disabled>
+                            <i class="fas fa-search"></i> Verificar Novos Vídeos
+                        </button>
+                        <button id="btn-force-send" class="btn btn-warning" disabled>
+                            <i class="fas fa-paper-plane"></i> Envio Manual
+                        </button>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="btn-toggle-auto" class="btn btn-secondary" disabled>
+                            <i class="fas fa-clock"></i> <span id="auto-btn-text">Ativar Auto (8h,12h,18h)</span>
+                        </button>
+                        <button id="btn-test-video" class="btn btn-secondary">
+                            <i class="fas fa-vial"></i> Testar YouTube
+                        </button>
+                        <button id="btn-clean-session" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Limpar Sessão
+                        </button>
+                    </div>
+                </div>
+
+                <div class="groups-section">
+                    <h2 class="section-title"><i class="fas fa-users"></i> Gerenciar Grupos</h2>
+                    <p>Ative ou desative grupos para receber os novos vídeos:</p>
+                    <div class="groups-list" id="groups-list">
+                        <div style="text-align: center; color: #999; padding: 20px;">
+                            <i class="fas fa-info-circle"></i> Conecte ao WhatsApp para carregar os grupos
+                        </div>
+                    </div>
+                </div>
+
+                <div class="schedules-section">
+                    <h2 class="section-title"><i class="fas fa-calendar-alt"></i> Agendamentos Personalizados</h2>
+                    <p>Crie agendamentos personalizados usando expressões cron:</p>
+                    
+                    <div class="schedule-input">
+                        <input type="text" id="schedule-cron" placeholder="Ex: 0 9,21 * * * (9h e 21h todo dia)">
+                        <button id="btn-create-schedule" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Criar
+                        </button>
+                    </div>
+
+                    <div class="schedule-examples">
+                        <h4>Exemplos:</h4>
+                        <ul>
+                            <li><code>*/30 * * * *</code> - A cada 30 minutos</li>
+                            <li><code>0 */2 * * *</code> - A cada 2 horas</li>
+                            <li><code>0 9,21 * * *</code> - 9h e 21h todo dia</li>
+                            <li><code>0 8 * * 1-5</code> - 8h segunda a sexta</li>
+                            <li><code>0 10 * * 0</code> - 10h todo domingo</li>
+                        </ul>
+                    </div>
+
+                    <div class="schedule-list" id="schedule-list">
+                        <!-- Agendamentos serão carregados aqui -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="qr-section">
+                    <h2 class="section-title"><i class="fas fa-qrcode"></i> QR Code</h2>
+                    <div id="qr-container">
+                        <p style="color: #999; text-align: center;">
+                            <i class="fas fa-mobile-alt" style="font-size: 3em; margin-bottom: 15px; display: block;"></i>
+                            Clique em "Conectar WhatsApp" para gerar o QR Code
+                        </p>
+                    </div>
+                </div>
+
+                <div class="log-section">
+                    <h2 class="section-title"><i class="fas fa-terminal"></i> Log do Sistema</h2>
+                    <div class="log-container" id="log-container">
+                        <div class="log-entry log-info">
+                            <strong>[SISTEMA]</strong> Disparador iniciado e pronto para uso!
+                        </div>
+                        <div class="log-entry log-info">
+                            <strong>[DICA]</strong> Conecte ao WhatsApp para começar a usar o bot
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para informações de vídeo -->
+    <div id="video-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-video"></i> Informações do Vídeo</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div id="video-modal-content">
+                <!-- Conteúdo será preenchido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Área de notificações -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        class WhatsAppBotClient {
+            constructor() {
+                this.socket = io();
+                this.isConnected = false;
+                this.autoScheduleEnabled = false;
+                this.groups = [];
+                this.schedules = [];
+                
+                this.initializeEventListeners();
+                this.setupSocketEvents();
+            }
+
+            initializeEventListeners() {
+                // Botões principais
+                document.getElementById('btn-connect').addEventListener('click', () => {
+                    this.socket.emit('connect_whatsapp');
+                });
+
+                document.getElementById('btn-disconnect').addEventListener('click', () => {
+                    this.socket.emit('disconnect_whatsapp');
+                });
+
+                document.getElementById('btn-check-videos').addEventListener('click', () => {
+                    this.socket.emit('check_videos');
+                });
+
+                document.getElementById('btn-force-send').addEventListener('click', () => {
+                    if (confirm('Tem certeza que deseja enviar o último vídeo mesmo que já tenha sido enviado?')) {
+                        this.socket.emit('force_send');
+                    }
+                });
+
+                document.getElementById('btn-toggle-auto').addEventListener('click', () => {
+                    this.socket.emit('toggle_auto_schedule');
+                });
+
+                document.getElementById('btn-test-video').addEventListener('click', () => {
+                    this.socket.emit('test_video');
+                });
+
+                document.getElementById('btn-clean-session').addEventListener('click', () => {
+                    if (confirm('ATENÇÃO! Esta ação irá resetar a sessão do WhatsApp. Você precisará escanear o QR Code novamente. Confirma?')) {
+                        this.socket.emit('clean_session');
+                    }
+                });
+
+                // Criar agendamento
+                document.getElementById('btn-create-schedule').addEventListener('click', () => {
+                    const cronExpr = document.getElementById('schedule-cron').value.trim();
+                    if (cronExpr) {
+                        this.socket.emit('create_schedule', cronExpr);
+                        document.getElementById('schedule-cron').value = '';
+                    } else {
+                        this.showNotification('Digite uma expressão cron válida!', 'error');
+                    }
+                });
+
+                // Enter no input de agendamento
+                document.getElementById('schedule-cron').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        document.getElementById('btn-create-schedule').click();
+                    }
+                });
+
+                // Fechar modal
+                document.querySelector('.modal-close').addEventListener('click', () => {
+                    document.getElementById('video-modal').style.display = 'none';
+                });
+
+                // Fechar modal clicando fora
+                window.addEventListener('click', (e) => {
+                    const modal = document.getElementById('video-modal');
+                    if (e.target === modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+            }
+
+            setupSocketEvents() {
+                this.socket.on('status', (data) => {
+                    this.updateStatus(data);
+                });
+
+                this.socket.on('connecting', () => {
+                    this.updateConnectionStatus('connecting');
+                });
+
+                this.socket.on('qr_code', (data) => {
+                    this.showQRCode(data.qrCode);
+                });
+
+                this.socket.on('connected', (data) => {
+                    this.updateConnectionStatus('connected');
+                    this.updateStats(data);
+                    this.showNotification('WhatsApp conectado com sucesso!', 'success');
+                });
+
+                this.socket.on('disconnected', (data) => {
+                    this.updateConnectionStatus('disconnected');
+                    this.clearQRCode();
+                    this.showNotification('WhatsApp desconectado: ' + data.reason, 'warning');
+                });
+
+                this.socket.on('authenticated', () => {
+                    this.addLog('Autenticação realizada com sucesso!', 'success');
+                });
+
+                this.socket.on('auth_failure', (data) => {
+                    this.addLog('Falha na autenticação: ' + data.message, 'error');
+                    this.showNotification('Erro de autenticação!', 'error');
+                });
+
+                this.socket.on('groups_loaded', (data) => {
+                    this.groups = data.groups;
+                    this.renderGroups();
+                });
+
+                this.socket.on('group_updated', (data) => {
+                    const group = this.groups.find(g => g.id === data.groupId);
+                    if (group) {
+                        group.active = data.active;
+                        this.renderGroups();
+                        this.updateActiveGroupsCount();
+                    }
+                });
+
+                this.socket.on('log', (data) => {
+                    this.addLog(data.message, data.type);
+                });
+
+                this.socket.on('error', (data) => {
+                    this.addLog(data.message, 'error');
+                    this.showNotification(data.message, 'error');
+                });
+
+                this.socket.on('video_test', (data) => {
+                    this.showVideoModal(data.videoData, data.isNew);
+                });
+
+                this.socket.on('video_sent', (data) => {
+                    this.showVideoModal(data.videoData, false, data.sentCount, data.totalGroups);
+                });
+
+                this.socket.on('auto_schedule_changed', (data) => {
+                    this.autoScheduleEnabled = data.enabled;
+                    this.updateAutoScheduleStatus();
+                });
+
+                this.socket.on('schedule_created', (data) => {
+                    this.schedules.push(data);
+                    this.renderSchedules();
+                    this.showNotification('Agendamento criado com sucesso!', 'success');
+                });
+
+                this.socket.on('schedule_removed', (data) => {
+                    this.schedules = this.schedules.filter(s => s.id !== data.id);
+                    this.renderSchedules();
+                    this.showNotification('Agendamento removido!', 'info');
+                });
+            }
+
+            updateConnectionStatus(status) {
+                const icon = document.getElementById('connection-icon');
+                const statusText = document.getElementById('connection-status');
+                const buttons = {
+                    connect: document.getElementById('btn-connect'),
+                    disconnect: document.getElementById('btn-disconnect'),
+                    checkVideos: document.getElementById('btn-check-videos'),
+                    forceSend: document.getElementById('btn-force-send'),
+                    toggleAuto: document.getElementById('btn-toggle-auto')
+                };
+
+                switch (status) {
+                    case 'connected':
+                        this.isConnected = true;
+                        icon.className = 'fas fa-circle status-connected';
+                        statusText.textContent = 'Conectado';
+                        buttons.connect.disabled = true;
+                        buttons.disconnect.disabled = false;
+                        buttons.checkVideos.disabled = false;
+                        buttons.forceSend.disabled = false;
+                        buttons.toggleAuto.disabled = false;
+                        break;
+                    case 'connecting':
+                        icon.className = 'fas fa-circle status-connecting pulse';
+                        statusText.textContent = 'Conectando...';
+                        buttons.connect.disabled = true;
+                        break;
+                    case 'disconnected':
+                        this.isConnected = false;
+                        icon.className = 'fas fa-circle status-disconnected';
+                        statusText.textContent = 'Desconectado';
+                        buttons.connect.disabled = false;
+                        buttons.disconnect.disabled = true;
+                        buttons.checkVideos.disabled = true;
+                        buttons.forceSend.disabled = true;
+                        buttons.toggleAuto.disabled = true;
+                        break;
+                }
+            }
+
+            updateAutoScheduleStatus() {
+                const icon = document.getElementById('auto-icon');
+                const statusText = document.getElementById('auto-status');
+                const buttonText = document.getElementById('auto-btn-text');
+
+                if (this.autoScheduleEnabled) {
+                    icon.className = 'fas fa-clock status-active';
+                    statusText.textContent = 'Envio Automático: Ativo (8h, 12h, 18h)';
+                    buttonText.textContent = 'Desativar Auto';
+                } else {
+                    icon.className = 'fas fa-clock status-inactive';
+                    statusText.textContent = 'Envio Automático: Inativo';
+                    buttonText.textContent = 'Ativar Auto (8h,12h,18h)';
+                }
+            }
+
+            updateStats(data) {
+                if (data.totalGroups !== undefined) {
+                    document.getElementById('total-groups').textContent = data.totalGroups;
+                }
+                this.updateActiveGroupsCount();
+            }
+
+            updateActiveGroupsCount() {
+                const activeCount = this.groups.filter(g => g.active).length;
+                document.getElementById('active-groups').textContent = activeCount;
+            }
+
+            updateStatus(data) {
+                this.isConnected = data.isConnected;
+                this.autoScheduleEnabled = data.autoScheduleEnabled;
+                
+                if (data.isConnecting) {
+                    this.updateConnectionStatus('connecting');
+                } else if (data.isConnected) {
+                    this.updateConnectionStatus('connected');
+                } else {
+                    this.updateConnectionStatus('disconnected');
+                }
+                
+                this.updateAutoScheduleStatus();
+                this.updateStats(data);
+                
+                if (data.qrCode) {
+                    this.showQRCode(data.qrCode);
+                }
+                
+                if (data.lastVideoId) {
+                    document.getElementById('last-video').textContent = data.lastVideoId.substring(0, 15) + '...';
+                }
+            }
+
+            showQRCode(qrCodeUrl) {
+                const container = document.getElementById('qr-container');
+                container.innerHTML = `
+                    <p style="color: #333; margin-bottom: 15px;">
+                        <i class="fas fa-mobile-alt"></i> Escaneie o QR Code com seu WhatsApp:
+                    </p>
+                    <div class="qr-code">
+                        <img src="${qrCodeUrl}" alt="QR Code" />
+                    </div>
+                    <p style="color: #666; font-size: 0.9em;">
+                        Abra o WhatsApp > Menu > Dispositivos conectados > Conectar dispositivo
+                    </p>
+                `;
+            }
+
+            clearQRCode() {
+                const container = document.getElementById('qr-container');
+                container.innerHTML = `
+                    <p style="color: #999; text-align: center;">
+                        <i class="fas fa-mobile-alt" style="font-size: 3em; margin-bottom: 15px; display: block;"></i>
+                        WhatsApp desconectado
+                    </p>
+                `;
+            }
+
+            renderGroups() {
+                const container = document.getElementById('groups-list');
+                
+                if (this.groups.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #999; padding: 20px;">
+                            <i class="fas fa-info-circle"></i> Nenhum grupo encontrado
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = this.groups.map(group => `
+                    <div class="group-item">
+                        <div class="group-name">${group.name}</div>
+                        <div class="group-status ${group.active ? 'group-active' : 'group-inactive'}">
+                            ${group.active ? '🟢 ATIVO' : '🔴 INATIVO'}
+                        </div>
+                        <div class="group-actions">
+                            <button class="btn btn-small ${group.active ? 'btn-warning' : 'btn-primary'}" 
+                                    onclick="botClient.toggleGroup('${group.name}', ${group.active})">
+                                ${group.active ? 'Desativar' : 'Ativar'}
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            toggleGroup(groupName, isActive) {
+                if (isActive) {
+                    this.socket.emit('deactivate_group', groupName);
+                } else {
+                    this.socket.emit('activate_group', groupName);
+                }
+            }
+
+            renderSchedules() {
+                const container = document.getElementById('schedule-list');
+                const customSchedules = this.schedules.filter(s => s.type === 'custom');
+                
+                if (customSchedules.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #999; padding: 15px; margin-top: 15px;">
+                            <i class="fas fa-clock"></i> Nenhum agendamento personalizado criado
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = `
+                    <h4 style="margin-top: 15px; margin-bottom: 10px; color: #333;">
+                        <i class="fas fa-list"></i> Agendamentos Ativos:
+                    </h4>
+                    ${customSchedules.map(schedule => `
+                        <div class="schedule-item">
+                            <div class="schedule-info">
+                                <div class="schedule-cron">${schedule.cron}</div>
+                                <div class="schedule-desc">${schedule.description}</div>
+                                <div style="font-size: 0.8em; color: #999;">
+                                    Criado: ${new Date(schedule.created).toLocaleDateString()}
+                                </div>
+                            </div>
+                            <button class="btn btn-danger btn-small" 
+                                    onclick="botClient.removeSchedule('${schedule.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                `;
+            }
+
+            removeSchedule(scheduleId) {
+                if (confirm('Tem certeza que deseja remover este agendamento?')) {
+                    this.socket.emit('remove_schedule', scheduleId);
+                }
+            }
+
+            showVideoModal(videoData, isNew, sentCount = null, totalGroups = null) {
+                const modal = document.getElementById('video-modal');
+                const content = document.getElementById('video-modal-content');
+                
+                let statusInfo = '';
+                if (sentCount !== null && totalGroups !== null) {
+                    statusInfo = `
+                        <div class="video-info" style="border-left-color: #4CAF50;">
+                            <div style="color: #4CAF50; font-weight: bold; margin-bottom: 8px;">
+                                <i class="fas fa-check-circle"></i> Vídeo Enviado com Sucesso!
+                            </div>
+                            <div>Enviado para <strong>${sentCount}/${totalGroups}</strong> grupos ativos</div>
+                        </div>
+                    `;
+                } else if (isNew) {
+                    statusInfo = `
+                        <div class="video-info" style="border-left-color: #4CAF50;">
+                            <div style="color: #4CAF50; font-weight: bold;">
+                                <i class="fas fa-star"></i> Novo Vídeo! Será enviado na próxima execução
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    statusInfo = `
+                        <div class="video-info" style="border-left-color: #FF9800;">
+                            <div style="color: #FF9800; font-weight: bold;">
+                                <i class="fas fa-info-circle"></i> Vídeo já foi processado anteriormente
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                content.innerHTML = `
+                    <div class="video-info">
+                        <div class="video-title">
+                            <i class="fas fa-video"></i> ${videoData.title}
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <strong>ID:</strong> ${videoData.videoId}
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <strong>Link:</strong> 
+                            <a href="${videoData.link}" target="_blank" class="video-link">${videoData.link}</a>
+                        </div>
+                    </div>
+                    ${statusInfo}
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button class="btn btn-primary" onclick="window.open('${videoData.link}', '_blank')">
+                            <i class="fas fa-external-link-alt"></i> Abrir Vídeo
+                        </button>
+                    </div>
+                `;
+                
+                modal.style.display = 'block';
+            }
+
+            addLog(message, type = 'info') {
+                const container = document.getElementById('log-container');
+                const timestamp = new Date().toLocaleTimeString();
+                
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry log-${type}`;
+                logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+                
+                container.appendChild(logEntry);
+                container.scrollTop = container.scrollHeight;
+                
+                // Manter apenas os últimos 100 logs
+                const entries = container.children;
+                if (entries.length > 100) {
+                    container.removeChild(entries[0]);
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.getElementById('notification');
+                notification.className = `notification notification-${type}`;
+                notification.textContent = message;
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 4000);
+            }
+        }
+
+        // Inicializar o cliente quando a página carregar
+        let botClient;
+        document.addEventListener('DOMContentLoaded', () => {
+            botClient = new WhatsAppBotClient();
+        });
+    </script>
+</body>
+</html>
