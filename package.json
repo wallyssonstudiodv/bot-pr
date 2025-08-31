@@ -1,28 +1,28 @@
 {
-  "name": "youtube-whatsapp-bot",
-  "version": "1.0.0",
-  "description": "Bot WhatsApp para enviar notificações de novos vídeos do YouTube com agendamento",
+  "name": "youtube-whatsapp-bot-webjs",
+  "version": "2.0.0",
+  "description": "Bot WhatsApp para enviar notificações de novos vídeos do YouTube usando whatsapp-web.js",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "dev": "nodemon bot.js",
+    "clean": "node -e \"const fs = require('fs'); if(fs.existsSync('./.wwebjs_auth')) fs.rmSync('./.wwebjs_auth', {recursive: true, force: true}); console.log('Sessão limpa!');\""
   },
   "keywords": [
     "whatsapp",
     "bot",
     "youtube",
-    "baileys",
+    "whatsapp-web.js",
     "agendamento",
     "nodejs"
   ],
   "author": "Seu Nome",
   "license": "MIT",
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.0",
+    "whatsapp-web.js": "^1.25.0",
     "axios": "^1.6.0",
     "chalk": "^4.1.2",
     "node-cron": "^3.0.3",
-    "pino": "^8.16.0",
     "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {
