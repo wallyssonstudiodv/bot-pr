@@ -17,6 +17,7 @@ class YouTubeWhatsAppBot {
         this.channelId = "UCh-ceOeY4WVgS8R0onTaXmw";
         this.dataFile = './bot_data.json';
         this.lastVideoId = null;
+        this.autoScheduleEnabled = false;
         
         // Interface do terminal
         this.rl = readline.createInterface({
@@ -84,6 +85,7 @@ class YouTubeWhatsAppBot {
             console.log(chalk.green('\n✅ CONECTADO COM SUCESSO!'));
             console.log(chalk.green('WhatsApp Web está pronto para uso!\n'));
             await this.loadGroups();
+            this.setupAutoSchedule();
             this.showPrompt();
         });
 
@@ -117,10 +119,99 @@ class YouTubeWhatsAppBot {
                 if (chat.isGroup) {
                     const groupInfo = this.groups.get(chat.id._serialized);
                     const status = groupInfo?.active ? '🟢 ATIVO' : '🔴 INATIVO';
-                    message.reply(`🤖 Disparador Status: ${status}\n📋 Grupo: ${chat.name}\n\n✨ Wallysson Studio DV 2025`);
+                    const autoStatus = this.autoScheduleEnabled ? '🟢 ATIVADO' : '🔴 DESATIVADO';
+                    message.reply(`🤖 Disparador Status: ${status}\n📋 Grupo: ${chat.name}\n⏰ Envio Automático: ${autoStatus}\n🕒 Horários: 08:00, 12:00, 18:00\n\n✨ Wallysson Studio DV 2025`);
                 }
             }
         });
+    }
+
+    // Configura agendamento automático para 8h, 12h e 18h
+    setupAutoSchedule() {
+        if (this.autoScheduleEnabled) {
+            console.log(chalk.green('⏰ Agendamento automático já está ativo!'));
+            return;
+        }
+
+        try {
+            // Agendamento para 8:00
+            const morning = cron.schedule('0 8 * * *', () => {
+                console.log(chalk.blue('\n⏰ VERIFICAÇÃO AUTOMÁTICA - 08:00'));
+                console.log(chalk.gray('📅 ' + new Date().toLocaleString()));
+                this.checkAndSendNewVideos();
+            });
+
+            // Agendamento para 12:00
+            const noon = cron.schedule('0 12 * * *', () => {
+                console.log(chalk.blue('\n⏰ VERIFICAÇÃO AUTOMÁTICA - 12:00'));
+                console.log(chalk.gray('📅 ' + new Date().toLocaleString()));
+                this.checkAndSendNewVideos();
+            });
+
+            // Agendamento para 18:00
+            const evening = cron.schedule('0 18 * * *', () => {
+                console.log(chalk.blue('\n⏰ VERIFICAÇÃO AUTOMÁTICA - 18:00'));
+                console.log(chalk.gray('📅 ' + new Date().toLocaleString()));
+                this.checkAndSendNewVideos();
+            });
+
+            // Salva os agendamentos
+            this.schedules.set('auto_08h', {
+                cron: '0 8 * * *',
+                task: morning,
+                created: new Date().toISOString(),
+                type: 'auto',
+                description: 'Envio automático - 08:00'
+            });
+
+            this.schedules.set('auto_12h', {
+                cron: '0 12 * * *',
+                task: noon,
+                created: new Date().toISOString(),
+                type: 'auto',
+                description: 'Envio automático - 12:00'
+            });
+
+            this.schedules.set('auto_18h', {
+                cron: '0 18 * * *',
+                task: evening,
+                created: new Date().toISOString(),
+                type: 'auto',
+                description: 'Envio automático - 18:00'
+            });
+
+            this.autoScheduleEnabled = true;
+            this.saveData();
+
+            console.log(chalk.green('\n✅ AGENDAMENTO AUTOMÁTICO CONFIGURADO!'));
+            console.log(chalk.white('🕰️  Horários programados:'));
+            console.log(chalk.yellow('    • 08:00 - Verificação matinal'));
+            console.log(chalk.yellow('    • 12:00 - Verificação do meio-dia'));
+            console.log(chalk.yellow('    • 18:00 - Verificação noturna'));
+            console.log(chalk.green('🤖 O bot verificará automaticamente novos vídeos nesses horários!'));
+
+        } catch (error) {
+            console.log(chalk.red('❌ Erro ao configurar agendamentos automáticos:', error.message));
+        }
+    }
+
+    // Desativa agendamento automático
+    disableAutoSchedule() {
+        const autoScheduleIds = ['auto_08h', 'auto_12h', 'auto_18h'];
+        
+        for (const id of autoScheduleIds) {
+            const schedule = this.schedules.get(id);
+            if (schedule && schedule.task) {
+                schedule.task.stop();
+                this.schedules.delete(id);
+            }
+        }
+
+        this.autoScheduleEnabled = false;
+        this.saveData();
+
+        console.log(chalk.yellow('🔴 Agendamento automático DESATIVADO!'));
+        console.log(chalk.gray('💡 Use "auto-ativar" para reativar.'));
     }
 
     // Carrega dados salvos
@@ -130,6 +221,7 @@ class YouTubeWhatsAppBot {
                 const data = JSON.parse(fs.readFileSync(this.dataFile, 'utf8'));
                 this.schedules = new Map(data.schedules || []);
                 this.lastVideoId = data.lastVideoId || null;
+                this.autoScheduleEnabled = data.autoScheduleEnabled || false;
                 
                 // Recriar os cron jobs
                 for (const [id, scheduleData] of this.schedules) {
@@ -147,7 +239,7 @@ class YouTubeWhatsAppBot {
     recreateSchedule(id, scheduleData) {
         try {
             const task = cron.schedule(scheduleData.cron, () => {
-                console.log(chalk.blue('\n⏰ Executando verificação automática...'));
+                console.log(chalk.blue(`\n⏰ ${scheduleData.description || 'VERIFICAÇÃO AUTOMÁTICA'}`));
                 console.log(chalk.gray('📅 ' + new Date().toLocaleString()));
                 this.checkAndSendNewVideos();
             }, {
@@ -173,13 +265,16 @@ class YouTubeWhatsAppBot {
             for (const [id, schedule] of this.schedules) {
                 schedulesToSave.set(id, {
                     cron: schedule.cron,
-                    created: schedule.created
+                    created: schedule.created,
+                    type: schedule.type || 'manual',
+                    description: schedule.description || ''
                 });
             }
 
             const data = {
                 schedules: Array.from(schedulesToSave),
-                lastVideoId: this.lastVideoId
+                lastVideoId: this.lastVideoId,
+                autoScheduleEnabled: this.autoScheduleEnabled
             };
             fs.writeFileSync(this.dataFile, JSON.stringify(data, null, 2));
         } catch (error) {
@@ -292,7 +387,7 @@ class YouTubeWhatsAppBot {
     }
 
     // Verifica novos vídeos e envia
-    async checkAndSendNewVideos() {
+    async checkAndSendNewVideos(forceCheck = false) {
         if (!this.isConnected) {
             console.log(chalk.red('❌ WhatsApp não está conectado!'));
             return;
@@ -306,12 +401,16 @@ class YouTubeWhatsAppBot {
             return;
         }
 
-        if (videoData.isNew) {
-            console.log(chalk.green(`🆕 NOVO VÍDEO ENCONTRADO!`));
-            console.log(chalk.white(`📺 Título: ${videoData.title}`));
-            
-            this.lastVideoId = videoData.videoId;
-            this.saveData();
+        if (videoData.isNew || forceCheck) {
+            if (forceCheck && !videoData.isNew) {
+                console.log(chalk.blue(`🔄 ENVIO MANUAL FORÇADO!`));
+                console.log(chalk.white(`📺 Reenviando: ${videoData.title}`));
+            } else {
+                console.log(chalk.green(`🆕 NOVO VÍDEO ENCONTRADO!`));
+                console.log(chalk.white(`📺 Título: ${videoData.title}`));
+                this.lastVideoId = videoData.videoId;
+                this.saveData();
+            }
 
             // Envia para todos os grupos ativos
             const activeGroups = Array.from(this.groups.entries()).filter(([id, data]) => data.active);
@@ -340,6 +439,27 @@ class YouTubeWhatsAppBot {
         } else {
             console.log(chalk.gray('📺 Nenhum vídeo novo encontrado (já foi enviado)'));
         }
+    }
+
+    // Envio manual forçado (mesmo que já tenha sido enviado)
+    async forceManualSend() {
+        if (!this.isConnected) {
+            console.log(chalk.red('❌ WhatsApp não está conectado!'));
+            return;
+        }
+
+        console.log(chalk.blue('\n🚀 ENVIO MANUAL INICIADO'));
+        console.log(chalk.yellow('⚠️  Este comando enviará o último vídeo mesmo que já tenha sido enviado antes.'));
+        
+        this.rl.question(chalk.cyan('\n❓ Confirma o envio manual? (s/N): '), async (answer) => {
+            if (answer.toLowerCase() === 's' || answer.toLowerCase() === 'sim') {
+                await this.checkAndSendNewVideos(true);
+            } else {
+                console.log(chalk.gray('❌ Envio manual cancelado.'));
+            }
+            this.showPrompt();
+        });
+        return;
     }
 
     // Delay helper
@@ -382,28 +502,41 @@ class YouTubeWhatsAppBot {
                 case '6':
                     this.deactivateGroup(args.join(' '));
                     break;
-                case 'enviar':
+                case 'verificar':
                 case '7':
                     await this.checkAndSendNewVideos();
                     break;
-                case 'agendar':
+                case 'enviar-manual':
+                case 'manual':
                 case '8':
+                    await this.forceManualSend();
+                    break;
+                case 'auto-ativar':
+                case '9':
+                    this.setupAutoSchedule();
+                    break;
+                case 'auto-desativar':
+                case '10':
+                    this.disableAutoSchedule();
+                    break;
+                case 'agendar':
+                case '11':
                     this.scheduleMenu();
                     break;
                 case 'agendamentos':
-                case '9':
+                case '12':
                     this.listSchedules();
                     break;
                 case 'testar':
-                case '10':
+                case '13':
                     await this.testVideo();
                     break;
                 case 'limpar':
-                case '11':
+                case '14':
                     this.cleanSession();
                     break;
                 case 'reiniciar':
-                case '12':
+                case '15':
                     await this.restart();
                     break;
                 case 'cls':
@@ -418,6 +551,9 @@ class YouTubeWhatsAppBot {
                     break;
                 case 'creditos':
                     this.showCredits();
+                    break;
+                case 'remover':
+                    this.removeSchedule(args[0]);
                     break;
                 default:
                     if (command.trim() !== '') {
@@ -440,32 +576,40 @@ class YouTubeWhatsAppBot {
         console.log(chalk.cyan('╠══════════════════════════════════════════════════════════════════════════╣'));
         console.log(chalk.white('║                                                                          ║'));
         console.log(chalk.white('║  🔗 CONEXÃO:                                                             ║'));
-        console.log(chalk.yellow('║    1. conectar      - Conectar ao WhatsApp                              ║'));
-        console.log(chalk.yellow('║    2. desconectar   - Desconectar do WhatsApp                           ║'));
-        console.log(chalk.yellow('║    3. status        - Ver status da conexão                             ║'));
+        console.log(chalk.yellow('║    1. conectar         - Conectar ao WhatsApp                           ║'));
+        console.log(chalk.yellow('║    2. desconectar      - Desconectar do WhatsApp                        ║'));
+        console.log(chalk.yellow('║    3. status           - Ver status da conexão                          ║'));
         console.log(chalk.white('║                                                                          ║'));
         console.log(chalk.white('║  📋 GRUPOS:                                                              ║'));
-        console.log(chalk.green('║    4. grupos        - Listar todos os grupos                            ║'));
-        console.log(chalk.green('║    5. ativar        - Ativar grupo (ex: ativar Família)                 ║'));
-        console.log(chalk.green('║    6. desativar     - Desativar grupo                                   ║'));
+        console.log(chalk.green('║    4. grupos           - Listar todos os grupos                         ║'));
+        console.log(chalk.green('║    5. ativar           - Ativar grupo (ex: ativar Família)              ║'));
+        console.log(chalk.green('║    6. desativar        - Desativar grupo                                ║'));
         console.log(chalk.white('║                                                                          ║'));
-        console.log(chalk.white('║  🤖 AUTOMAÇÃO:                                                           ║'));
-        console.log(chalk.blue('║    7. enviar        - Verificar e enviar vídeos novos                   ║'));
-        console.log(chalk.blue('║    8. agendar       - Programar envios automáticos                      ║'));
-        console.log(chalk.blue('║    9. agendamentos  - Ver programações ativas                           ║'));
+        console.log(chalk.white('║  🤖 ENVIOS:                                                              ║'));
+        console.log(chalk.blue('║    7. verificar        - Verificar novos vídeos (apenas novos)          ║'));
+        console.log(chalk.magenta('║    8. enviar-manual    - Enviar último vídeo (forçado)                  ║'));
         console.log(chalk.white('║                                                                          ║'));
-        console.log(chalk.white('║  🛠️  FERRAMENTAS:                                                        ║'));
-        console.log(chalk.magenta('║    10. testar       - Testar busca de vídeos                           ║'));
-        console.log(chalk.magenta('║    11. limpar       - Resetar sessão do WhatsApp                       ║'));
-        console.log(chalk.magenta('║    12. reiniciar    - Reiniciar conexão                                ║'));
+        console.log(chalk.white('║  ⏰ AUTOMAÇÃO (8h, 12h, 18h):                                            ║'));
+        console.log(chalk.blue('║    9. auto-ativar      - Ativar envios automáticos                      ║'));
+        console.log(chalk.yellow('║    10. auto-desativar  - Desativar envios automáticos                   ║'));
+        console.log(chalk.white('║                                                                          ║'));
+        console.log(chalk.white('║  🛠️  AGENDAMENTO PERSONALIZADO:                                          ║'));
+        console.log(chalk.gray('║    11. agendar         - Criar agendamento personalizado                ║'));
+        console.log(chalk.gray('║    12. agendamentos    - Ver todos os agendamentos                      ║'));
+        console.log(chalk.white('║                                                                          ║'));
+        console.log(chalk.white('║  🔧 FERRAMENTAS:                                                         ║'));
+        console.log(chalk.magenta('║    13. testar          - Testar busca de vídeos                        ║'));
+        console.log(chalk.magenta('║    14. limpar          - Resetar sessão do WhatsApp                    ║'));
+        console.log(chalk.magenta('║    15. reiniciar       - Reiniciar conexão                             ║'));
         console.log(chalk.white('║                                                                          ║'));
         console.log(chalk.white('║  📱 OUTROS:                                                              ║'));
-        console.log(chalk.gray('║    cls/clear        - Limpar tela                                       ║'));
-        console.log(chalk.gray('║    creditos         - Ver créditos                                      ║'));
-        console.log(chalk.red('║    0. sair          - Encerrar bot                                      ║'));
+        console.log(chalk.gray('║    cls/clear           - Limpar tela                                    ║'));
+        console.log(chalk.gray('║    creditos            - Ver créditos                                   ║'));
+        console.log(chalk.red('║    0. sair             - Encerrar bot                                   ║'));
         console.log(chalk.white('║                                                                          ║'));
         console.log(chalk.cyan('╚══════════════════════════════════════════════════════════════════════════╝'));
-        console.log(chalk.gray('💡 Dica: Você pode usar números ou nomes dos comandos\n'));
+        console.log(chalk.green('\n💡 NOVIDADE: Agendamento automático para 08h, 12h e 18h!'));
+        console.log(chalk.gray('   Use "auto-ativar" para ativar e "enviar-manual" para envio imediato.\n'));
     }
 
     // Menu de agendamento
@@ -474,11 +618,17 @@ class YouTubeWhatsAppBot {
         console.log(chalk.cyan('║                        ⏰ MENU DE AGENDAMENTO                            ║'));
         console.log(chalk.cyan('╠══════════════════════════════════════════════════════════════════════════╣'));
         console.log(chalk.white('║                                                                          ║'));
+        console.log(chalk.green('║  🎯 AGENDAMENTO AUTOMÁTICO (RECOMENDADO):                               ║'));
+        console.log(chalk.yellow('║     • auto-ativar    - Ativa envios em 08h, 12h e 18h                  ║'));
+        console.log(chalk.yellow('║     • auto-desativar - Desativa envios automáticos                     ║'));
+        console.log(chalk.white('║                                                                          ║'));
+        console.log(chalk.blue('║  🛠️  AGENDAMENTO PERSONALIZADO:                                          ║'));
+        console.log(chalk.white('║                                                                          ║'));
         console.log(chalk.yellow('║  📅 EXEMPLOS DE HORÁRIOS:                                                ║'));
         console.log(chalk.white('║                                                                          ║'));
         console.log(chalk.green('║  • A cada 30 minutos:    agendar */30 * * * *                           ║'));
         console.log(chalk.green('║  • A cada hora:          agendar 0 * * * *                              ║'));
-        console.log(chalk.green('║  • 9h e 18h todo dia:    agendar 0 9,18 * * *                          ║'));
+        console.log(chalk.green('║  • 9h e 21h todo dia:    agendar 0 9,21 * * *                          ║'));
         console.log(chalk.green('║  • 8h segunda a sexta:   agendar 0 8 * * 1-5                           ║'));
         console.log(chalk.green('║  • Todo domingo às 10h:  agendar 0 10 * * 0                            ║'));
         console.log(chalk.white('║                                                                          ║'));
@@ -506,21 +656,28 @@ class YouTubeWhatsAppBot {
             chalk.green('🟢 CONECTADO') : 
             this.isConnecting ? chalk.yellow('🟡 CONECTANDO...') : chalk.red('🔴 DESCONECTADO');
         
+        const autoStatus = this.autoScheduleEnabled ? 
+            chalk.green('🟢 ATIVO (8h, 12h, 18h)') : chalk.red('🔴 DESATIVADO');
+        
         const totalGroups = this.groups.size;
         const activeGroups = Array.from(this.groups.values()).filter(g => g.active).length;
         const totalSchedules = this.schedules.size;
         const lastVideo = this.lastVideoId ? this.lastVideoId.substring(0, 15) + '...' : 'Nenhum';
         
         console.log(chalk.white(`║  🔗 Conexão WhatsApp:     ${connectionStatus.padEnd(30)} ║`));
+        console.log(chalk.white(`║  ⏰ Envio Automático:     ${autoStatus.padEnd(30)} ║`));
         console.log(chalk.white(`║  📋 Total de Grupos:      ${totalGroups.toString().padEnd(30)} ║`));
         console.log(chalk.white(`║  ✅ Grupos Ativos:        ${activeGroups.toString().padEnd(30)} ║`));
-        console.log(chalk.white(`║  ⏰ Agendamentos:         ${totalSchedules.toString().padEnd(30)} ║`));
+        console.log(chalk.white(`║  🛠️  Agendamentos Extras:  ${totalSchedules.toString().padEnd(30)} ║`));
         console.log(chalk.white(`║  📺 Último Vídeo:         ${lastVideo.padEnd(30)} ║`));
         console.log(chalk.white('║                                                                          ║'));
         console.log(chalk.cyan('╚══════════════════════════════════════════════════════════════════════════╝'));
         
         if (!this.isConnected && !this.isConnecting) {
-            console.log(chalk.yellow('\n💡 Para começar, use o comando "conectar"'));
+            console.log(chalk.yellow('\n💡 Para começar:'));
+            console.log(chalk.white('   1. Use "conectar" para conectar ao WhatsApp'));
+            console.log(chalk.white('   2. Use "auto-ativar" para ativar envios automáticos'));
+            console.log(chalk.white('   3. Use "ativar [nome]" para ativar grupos'));
         }
     }
 
@@ -622,7 +779,7 @@ class YouTubeWhatsAppBot {
         try {
             // Valida a expressão cron
             const task = cron.schedule(cronExpr, () => {
-                console.log(chalk.blue('\n⏰ VERIFICAÇÃO AUTOMÁTICA INICIADA'));
+                console.log(chalk.blue('\n⏰ VERIFICAÇÃO AUTOMÁTICA PERSONALIZADA'));
                 console.log(chalk.gray('📅 ' + new Date().toLocaleString()));
                 this.checkAndSendNewVideos();
             }, {
@@ -632,16 +789,18 @@ class YouTubeWhatsAppBot {
             this.schedules.set(scheduleId, {
                 cron: cronExpr,
                 task: task,
-                created: new Date().toISOString()
+                created: new Date().toISOString(),
+                type: 'custom',
+                description: `Agendamento personalizado: ${cronExpr}`
             });
 
             task.start();
             this.saveData();
 
-            console.log(chalk.green('✅ AGENDAMENTO CRIADO COM SUCESSO!'));
+            console.log(chalk.green('✅ AGENDAMENTO PERSONALIZADO CRIADO!'));
             console.log(chalk.white(`🆔 ID: ${scheduleId}`));
             console.log(chalk.white(`⏰ Horário: ${cronExpr}`));
-            console.log(chalk.green('🤖 O disparador agora verificará automaticamente novos vídeos!'));
+            console.log(chalk.green('🤖 O bot verificará automaticamente novos vídeos neste horário!'));
         } catch (error) {
             console.log(chalk.red('❌ ERRO: Expressão de horário inválida!'));
             console.log(chalk.yellow('💡 Use "agendar" sem parâmetros para ver exemplos.'));
@@ -657,23 +816,43 @@ class YouTubeWhatsAppBot {
         if (this.schedules.size === 0) {
             console.log(chalk.white('║                                                                          ║'));
             console.log(chalk.gray('║                   ⚠️  Nenhum agendamento ativo                          ║'));
-            console.log(chalk.gray('║                Use "agendar" para criar um                              ║'));
+            console.log(chalk.gray('║                Use "auto-ativar" ou "agendar"                          ║'));
             console.log(chalk.white('║                                                                          ║'));
         } else {
             console.log(chalk.white('║                                                                          ║'));
-            let index = 1;
-            for (const [id, schedule] of this.schedules) {
-                const createdDate = new Date(schedule.created).toLocaleDateString();
-                const createdTime = new Date(schedule.created).toLocaleTimeString();
-                
-                console.log(chalk.white(`║  ${index}. ID: ${id.padEnd(15)} ║`));
-                console.log(chalk.gray(`║     ⏰ Horário: ${schedule.cron.padEnd(20)} ║`));
-                console.log(chalk.gray(`║     📅 Criado: ${createdDate} ${createdTime.padEnd(15)} ║`));
+            
+            // Mostra status do agendamento automático
+            if (this.autoScheduleEnabled) {
+                console.log(chalk.green('║  🎯 AGENDAMENTO AUTOMÁTICO: ATIVO                                       ║'));
+                console.log(chalk.yellow('║     • 08:00 - Verificação matinal                                       ║'));
+                console.log(chalk.yellow('║     • 12:00 - Verificação do meio-dia                                   ║'));
+                console.log(chalk.yellow('║     • 18:00 - Verificação noturna                                       ║'));
                 console.log(chalk.white('║                                                                          ║'));
-                index++;
             }
-            console.log(chalk.yellow('║  💡 Para remover: remover [ID]                                           ║'));
-            console.log(chalk.white('║                                                                          ║'));
+            
+            // Mostra agendamentos personalizados
+            const customSchedules = Array.from(this.schedules.entries()).filter(([id, schedule]) => 
+                schedule.type === 'custom' || schedule.type === 'manual'
+            );
+            
+            if (customSchedules.length > 0) {
+                console.log(chalk.blue('║  🛠️  AGENDAMENTOS PERSONALIZADOS:                                        ║'));
+                console.log(chalk.white('║                                                                          ║'));
+                
+                let index = 1;
+                for (const [id, schedule] of customSchedules) {
+                    const createdDate = new Date(schedule.created).toLocaleDateString();
+                    const idShort = id.substring(0, 10) + '...';
+                    
+                    console.log(chalk.white(`║  ${index}. ID: ${idShort.padEnd(15)} ║`));
+                    console.log(chalk.gray(`║     ⏰ Horário: ${schedule.cron.padEnd(20)} ║`));
+                    console.log(chalk.gray(`║     📅 Criado: ${createdDate.padEnd(15)} ║`));
+                    console.log(chalk.white('║                                                                          ║'));
+                    index++;
+                }
+                console.log(chalk.yellow('║  💡 Para remover: remover [ID completo]                                  ║'));
+                console.log(chalk.white('║                                                                          ║'));
+            }
         }
         
         console.log(chalk.cyan('╚══════════════════════════════════════════════════════════════════════════╝'));
@@ -687,12 +866,19 @@ class YouTubeWhatsAppBot {
             return;
         }
 
+        // Não permite remover agendamentos automáticos
+        if (id.startsWith('auto_')) {
+            console.log(chalk.red('❌ Não é possível remover agendamentos automáticos!'));
+            console.log(chalk.yellow('💡 Use "auto-desativar" para desativar os envios automáticos.'));
+            return;
+        }
+
         const schedule = this.schedules.get(id);
         if (schedule) {
             schedule.task.stop();
             this.schedules.delete(id);
             this.saveData();
-            console.log(chalk.green(`✅ Agendamento ${id} removido com sucesso!`));
+            console.log(chalk.green(`✅ Agendamento ${id.substring(0, 10)}... removido com sucesso!`));
         } else {
             console.log(chalk.red('❌ Agendamento não encontrado!'));
             console.log(chalk.yellow('💡 Verifique o ID com o comando "agendamentos".'));
@@ -734,6 +920,7 @@ class YouTubeWhatsAppBot {
                 console.log(chalk.green('\n🎉 Este vídeo será enviado na próxima execução!'));
             } else {
                 console.log(chalk.yellow('\n⚠️ Este vídeo já foi enviado anteriormente.'));
+                console.log(chalk.blue('💡 Use "enviar-manual" para reenviar mesmo assim.'));
             }
         } else {
             console.log(chalk.red('❌ ERRO! Não foi possível buscar vídeos.'));
@@ -799,7 +986,7 @@ class YouTubeWhatsAppBot {
         console.log(chalk.yellow('║                        🎯 WALLYSSON STUDIO DV                            ║'));
         console.log(chalk.yellow('║                              © 2025                                     ║'));
         console.log(chalk.white('║                                                                          ║'));
-        console.log(chalk.green('║  🚀 Disparador Canal PR Marcelo Oliveira - Versão 2.0                  ║'));
+        console.log(chalk.green('║  🚀 Disparador Canal PR Marcelo Oliveira - Versão 2.1                  ║'));
         console.log(chalk.white('║                                                                          ║'));
         console.log(chalk.blue('║  📧 Desenvolvido com dedicação para automação                           ║'));
         console.log(chalk.blue('║     de conteúdo do Pastor Marcelo Oliveira                              ║'));
@@ -851,7 +1038,8 @@ class YouTubeWhatsAppBot {
     // Mostra prompt personalizado
     showPrompt() {
         const statusIcon = this.isConnected ? '🟢' : this.isConnecting ? '🟡' : '🔴';
-        process.stdout.write(chalk.cyan(`\n${statusIcon} Disparador> `));
+        const autoIcon = this.autoScheduleEnabled ? '⏰' : '⏸️';
+        process.stdout.write(chalk.cyan(`\n${statusIcon}${autoIcon} Disparador> `));
     }
 
     // Sair com confirmação
@@ -863,7 +1051,9 @@ class YouTubeWhatsAppBot {
         
         console.log(chalk.blue('⏰ Parando agendamentos...'));
         for (const [id, schedule] of this.schedules) {
-            schedule.task.stop();
+            if (schedule.task) {
+                schedule.task.stop();
+            }
         }
         
         console.log(chalk.blue('🚪 Desconectando do WhatsApp...'));
@@ -874,23 +1064,6 @@ class YouTubeWhatsAppBot {
         console.log(chalk.gray('❤️  Até a próxima!\n'));
         
         process.exit(0);
-    }
-
-    // Processa comando de agendamento
-    async processScheduleCommand(input) {
-        const [command, ...args] = input.trim().split(' ');
-        
-        switch (command.toLowerCase()) {
-            case 'agendar':
-                this.scheduleMessage(args);
-                break;
-            case 'remover':
-                this.removeSchedule(args[0]);
-                break;
-            default:
-                console.log(chalk.red('❌ Comando de agendamento inválido!'));
-                console.log(chalk.yellow('💡 Use "agendar" para ver as opções.'));
-        }
     }
 }
 
