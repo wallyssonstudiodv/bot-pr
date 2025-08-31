@@ -1,0 +1,34 @@
+{
+  "name": "youtube-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp para enviar notificações de novos vídeos do YouTube com agendamento",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "youtube",
+    "baileys",
+    "agendamento",
+    "nodejs"
+  ],
+  "author": "Seu Nome",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2",
+    "node-cron": "^3.0.3",
+    "pino": "^8.16.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
