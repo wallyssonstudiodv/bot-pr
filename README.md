@@ -1,10 +1,10 @@
-# 🤖 Bot WhatsApp YouTube com Baileys
+# 🤖 Bot WhatsApp YouTube com whatsapp-web.js
 
-Bot automatizado para enviar notificações de novos vídeos do YouTube para grupos do WhatsApp com sistema de agendamento e painel de controle via terminal.
+Bot automatizado para enviar notificações de novos vídeos do YouTube para grupos do WhatsApp usando **whatsapp-web.js** - mais estável que Baileys!
 
 ## 🚀 Funcionalidades
 
-- ✅ Conexão com WhatsApp via Baileys (última versão)
+- ✅ Conexão estável com WhatsApp via whatsapp-web.js
 - ✅ Busca automática de novos vídeos do YouTube
 - ✅ Envio para múltiplos grupos selecionados
 - ✅ Sistema de agendamento com cron jobs
@@ -13,6 +13,16 @@ Bot automatizado para enviar notificações de novos vídeos do YouTube para gru
 - ✅ Envio de mensagem + imagem (thumbnail do vídeo)
 - ✅ Detecção de vídeos novos
 - ✅ Persistência de dados
+- ✅ Comando opcional para resposta em grupos (!status)
+- ✅ Limpeza automática de sessão corrompida
+
+## 🔧 Principais Melhorias vs Baileys
+
+- **Mais estável**: Menos desconexões
+- **Melhor QR Code**: Exibido diretamente no terminal
+- **Sessão persistente**: Não precisa escanear sempre
+- **Melhor controle**: Comandos disconnect, restart, clean
+- **Menos bugs**: Biblioteca mais madura
 
 ## 📋 Pré-requisitos
 
