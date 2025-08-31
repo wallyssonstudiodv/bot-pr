@@ -21,6 +21,7 @@ class YouTubeWhatsAppBot {
         this.groups = new Map();
         this.schedules = new Map();
         this.isConnected = false;
+        this.isConnecting = false; // Novo flag para controlar conexão
         this.youtubeApiKey = "AIzaSyDubEpb0TkgZjiyjA9-1QM_56Kwnn_SMPs";
         this.channelId = "UCh-ceOeY4WVgS8R0onTaXmw";
         this.dataFile = './bot_data.json';
@@ -158,6 +159,13 @@ class YouTubeWhatsAppBot {
 
     // Conecta ao WhatsApp
     async connectToWhatsApp() {
+        if (this.isConnecting) {
+            console.log(chalk.yellow('⏳ Já está conectando, aguarde...'));
+            return;
+        }
+
+        this.isConnecting = true;
+
         try {
             const { state, saveCreds } = await useMultiFileAuthState('./auth');
             const { version } = await fetchLatestBaileysVersion();
@@ -167,7 +175,13 @@ class YouTubeWhatsAppBot {
                 logger: P({ level: 'silent' }),
                 printQRInTerminal: false,
                 browser: Browsers.macOS('Desktop'),
-                auth: state
+                auth: state,
+                connectTimeoutMs: 60000,
+                defaultQueryTimeoutMs: 0,
+                keepAliveIntervalMs: 10000,
+                generateHighQualityLinkPreview: true,
+                syncFullHistory: false,
+                markOnlineOnConnect: true
             });
 
             this.sock.ev.on('connection.update', async (update) => {
@@ -179,23 +193,44 @@ class YouTubeWhatsAppBot {
                 }
 
                 if (connection === 'close') {
-                    const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                    console.log(chalk.red('❌ Conexão fechada. Reconectando...'), shouldReconnect);
-                    if (shouldReconnect) {
-                        await this.connectToWhatsApp();
-                    }
                     this.isConnected = false;
+                    this.isConnecting = false;
+                    
+                    const statusCode = lastDisconnect?.error?.output?.statusCode;
+                    const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                    
+                    console.log(chalk.red('❌ Conexão fechada.'));
+                    console.log(chalk.gray(`Código: ${statusCode}, Reconectar: ${shouldReconnect}`));
+                    
+                    if (shouldReconnect) {
+                        console.log(chalk.yellow('🔄 Tentando reconectar em 5 segundos...'));
+                        setTimeout(() => {
+                            this.connectToWhatsApp();
+                        }, 5000);
+                    } else {
+                        console.log(chalk.red('🚪 Desconectado permanentemente. Use "connect" para reconectar.'));
+                    }
                 } else if (connection === 'open') {
-                    console.log(chalk.green('✅ Conectado ao WhatsApp!'));
+                    this.isConnecting = false;
                     this.isConnected = true;
+                    console.log(chalk.green('✅ Conectado ao WhatsApp!'));
                     await this.loadGroups();
+                } else if (connection === 'connecting') {
+                    console.log(chalk.blue('🔗 Conectando...'));
                 }
             });
 
             this.sock.ev.on('creds.update', saveCreds);
 
         } catch (error) {
+            this.isConnecting = false;
             console.log(chalk.red('❌ Erro na conexão:'), error.message);
+            
+            // Tentar reconectar após erro
+            setTimeout(() => {
+                console.log(chalk.yellow('🔄 Tentando reconectar após erro...'));
+                this.connectToWhatsApp();
+            }, 10000);
         }
     }
 
@@ -231,7 +266,19 @@ class YouTubeWhatsAppBot {
                     this.showHelp();
                     break;
                 case 'connect':
-                    await this.connectToWhatsApp();
+                    if (this.isConnected) {
+                        console.log(chalk.green('✅ Já está conectado!'));
+                    } else if (this.isConnecting) {
+                        console.log(chalk.yellow('⏳ Já está conectando, aguarde...'));
+                    } else {
+                        await this.connectToWhatsApp();
+                    }
+                    break;
+                case 'disconnect':
+                    this.disconnect();
+                    break;
+                case 'restart':
+                    await this.restart();
                     break;
                 case 'qr':
                     this.showQR();
@@ -283,6 +330,8 @@ class YouTubeWhatsAppBot {
     showHelp() {
         console.log(chalk.cyan('\n📖 COMANDOS DISPONÍVEIS:'));
         console.log(chalk.white('connect         - Conecta ao WhatsApp'));
+        console.log(chalk.white('disconnect      - Desconecta do WhatsApp'));
+        console.log(chalk.white('restart         - Reinicia a conexão'));
         console.log(chalk.white('qr              - Mostra o QR Code'));
         console.log(chalk.white('status          - Status da conexão'));
         console.log(chalk.white('groups          - Lista todos os grupos'));
@@ -445,6 +494,26 @@ class YouTubeWhatsAppBot {
         process.stdout.write(chalk.cyan('\n🤖 Bot> '));
     }
 
+    // Desconecta
+    disconnect() {
+        if (this.sock) {
+            this.sock.end();
+            this.sock = null;
+        }
+        this.isConnected = false;
+        this.isConnecting = false;
+        this.qr = null;
+        console.log(chalk.yellow('🚪 Desconectado do WhatsApp'));
+    }
+
+    // Reinicia conexão
+    async restart() {
+        console.log(chalk.blue('🔄 Reiniciando conexão...'));
+        this.disconnect();
+        await this.delay(2000);
+        await this.connectToWhatsApp();
+    }
+
     // Sair
     exit() {
         console.log(chalk.yellow('👋 Encerrando bot...'));
@@ -455,12 +524,17 @@ class YouTubeWhatsAppBot {
             schedule.task.stop();
         }
         
+        // Desconecta
+        this.disconnect();
+        
         process.exit(0);
     }
 }
 
 // Inicia o bot
 const bot = new YouTubeWhatsAppBot();
-bot.connectToWhatsApp();
+
+// Não conecta automaticamente - usuário deve usar comando "connect"
+console.log(chalk.green('🤖 Bot iniciado! Digite "connect" para conectar ao WhatsApp.'));
 
 module.exports = YouTubeWhatsAppBot;
