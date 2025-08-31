@@ -1,222 +1,247 @@
-# 🤖 Bot WhatsApp YouTube com whatsapp-web.js
+# 🚀 Disparador Canal PR Marcelo Oliveira
 
-Bot automatizado para enviar notificações de novos vídeos do YouTube para grupos do WhatsApp usando **whatsapp-web.js** - mais estável que Baileys!
+**Automatize o envio de novos vídeos do Pastor Marcelo Oliveira para seus grupos do WhatsApp!**
 
-## 🚀 Funcionalidades
-
-- ✅ Conexão estável com WhatsApp via whatsapp-web.js
-- ✅ Busca automática de novos vídeos do YouTube
-- ✅ Envio para múltiplos grupos selecionados
-- ✅ Sistema de agendamento com cron jobs
-- ✅ Painel de controle interativo no terminal
-- ✅ Gerenciamento de grupos (ativar/desativar)
-- ✅ Envio de mensagem + imagem (thumbnail do vídeo)
-- ✅ Detecção de vídeos novos
-- ✅ Persistência de dados
-- ✅ Comando opcional para resposta em grupos (!status)
-- ✅ Limpeza automática de sessão corrompida
-
-## 🔧 Principais Melhorias vs Baileys
-
-- **Mais estável**: Menos desconexões
-- **Melhor QR Code**: Exibido diretamente no terminal
-- **Sessão persistente**: Não precisa escanear sempre
-- **Melhor controle**: Comandos disconnect, restart, clean
-- **Menos bugs**: Biblioteca mais madura
-
-## 📋 Pré-requisitos
-
-- Node.js 16+ 
-- NPM ou Yarn
-- Chave da API do YouTube
-- WhatsApp instalado no celular
-
-## 🔧 Instalação
-
-1. **Clone ou baixe os arquivos**
-```bash
-git clone <seu-repositorio>
-cd youtube-whatsapp-bot
-```
-
-2. **Instale as dependências**
-```bash
-npm install
-```
-
-3. **Configure suas credenciais**
-   - Abra o arquivo `bot.js`
-   - Substitua a `youtubeApiKey` pela sua chave da API do YouTube
-   - Substitua o `channelId` pelo ID do seu canal
-
-4. **Execute o bot**
-```bash
-npm start
-```
-
-## 🎯 Como Usar
-
-### 1. **Primeira Conexão**
-```
-🤖 Bot> connect
-🤖 Bot> qr
-```
-- Escaneie o QR Code com seu WhatsApp
-
-### 2. **Comandos Principais**
-
-| Comando | Descrição |
-|---------|-----------|
-| `help` | Mostra todos os comandos |
-| `status` | Status da conexão e estatísticas |
-| `groups` | Lista todos os grupos disponíveis |
-| `activate <nome>` | Ativa um grupo para receber envios |
-| `deactivate <nome>` | Desativa um grupo |
-| `test` | Testa a busca de vídeos |
-| `send` | Verifica e envia vídeos novos manualmente |
-
-### 3. **Sistema de Agendamento**
-
-**Criar agendamento:**
-```bash
-🤖 Bot> schedule "0 9,18 * * *"
-```
-Isso irá verificar novos vídeos às 9h e 18h todos os dias.
-
-**Outros exemplos de agendamento:**
-- `"*/30 * * * *"` - A cada 30 minutos
-- `"0 8 * * 1-5"` - 8h de segunda a sexta
-- `"0 20 * * 0"` - 20h aos domingos
-
-**Gerenciar agendamentos:**
-```bash
-🤖 Bot> schedules          # Lista agendamentos
-🤖 Bot> remove <id>        # Remove agendamento
-```
-
-### 4. **Fluxo de Trabalho Típico**
-
-```bash
-# 1. Conectar
-🤖 Bot> connect
-
-# 2. Ver grupos disponíveis  
-🤖 Bot> groups
-
-# 3. Ativar grupos desejados
-🤖 Bot> activate Igreja
-🤖 Bot> activate Família
-
-# 4. Criar agendamento
-🤖 Bot> schedule "0 9,18 * * *"
-
-# 5. Testar
-🤖 Bot> test
-🤖 Bot> send
-```
-
-## 📱 Formato das Mensagens
-
-O bot envia duas mensagens:
-
-1. **Mensagem de texto:**
-```
-🚨 Saiu vídeo novo no canal!
-
-🎬 *Título do Vídeo*
-👉 Assista agora: https://youtube.com/watch?v=...
-
-Compartilhe com a família e amigos 🙏 Jesus abençoe!
-```
-
-2. **Imagem com legenda:**
-```
-🆕 Título do Vídeo
-🎥 Assista: https://youtube.com/watch?v=...
-```
-
-## 🔑 Obtendo API Key do YouTube
-
-1. Acesse [Google Cloud Console](https://console.cloud.google.com/)
-2. Crie um novo projeto
-3. Ative a "YouTube Data API v3"
-4. Vá em "Credenciais" → "Criar credenciais" → "Chave de API"
-5. Copie a chave gerada
-
-## 📁 Estrutura de Arquivos
-
-```
-youtube-whatsapp-bot/
-├── bot.js              # Arquivo principal do bot
-├── package.json        # Dependências
-├── bot_data.json       # Dados salvos automaticamente
-├── auth/               # Dados de autenticação (criado automaticamente)
-└── README.md          # Este arquivo
-```
-
-## ⚙️ Configurações Avançadas
-
-### Personalizar Mensagens
-Edite as variáveis no arquivo `bot.js`:
-```javascript
-const message = `🚨 Saiu vídeo novo no canal!\n\n🎬 *${videoData.title}*\n👉 Assista agora: ${videoData.link}\n\nCompartilhe com a família e amigos 🙏 Jesus abençoe!`;
-```
-
-### Alterar Delay Entre Envios
-```javascript
-await this.delay(2000); // 2 segundos entre grupos
-```
-
-## 🐛 Solução de Problemas
-
-### Bot não conecta
-- Verifique sua conexão com internet
-- Certifique-se que o WhatsApp Web está funcionando
-- Delete a pasta `auth` e reconecte
-
-### Não encontra vídeos
-- Verifique se a API Key está correta
-- Confirme se o Channel ID está correto
-- Teste manualmente: `🤖 Bot> test`
-
-### Grupos não aparecem
-- Certifique-se que o bot está conectado
-- Digite `🤖 Bot> groups` após conectar
-
-## 📊 Monitoramento
-
-O bot salva automaticamente:
-- Último vídeo processado
-- Configurações de grupos
-- Agendamentos ativos
-
-Dados salvos em: `bot_data.json`
-
-## 🔄 Reinicialização Automática
-
-Para manter o bot sempre rodando, use PM2:
-
-```bash
-npm install -g pm2
-pm2 start bot.js --name youtube-bot
-pm2 startup
-pm2 save
-```
-
-## ⚠️ Importantes
-
-- Mantenha sua API Key segura
-- Não abuse da API do YouTube (limite de requisições)
-- Respeite as políticas do WhatsApp
-- Teste sempre em grupos pequenos primeiro
-
-## 📞 Suporte
-
-Para dúvidas ou problemas:
-1. Verifique este README
-2. Use `🤖 Bot> help` para comandos
-3. Teste com `🤖 Bot> status` e `🤖 Bot> test`
+*Criado por: **Wallysson Studio DV 2025***
 
 ---
 
-**Desenvolvido com ❤️ usando Baileys e Node.js**
+## 📋 Sobre o Projeto
+
+O **Disparador Canal PR Marcelo Oliveira** é um sistema automatizado que monitora o canal do YouTube do Pastor Marcelo Oliveira e envia automaticamente notificações sobre novos vídeos para grupos selecionados do WhatsApp.
+
+### ✨ Características Principais
+
+- 🎯 **Interface Intuitiva**: Menu em português com comandos simplificados
+- 🔄 **Automação Completa**: Agendamento de verificações automáticas
+- 📱 **WhatsApp Integration**: Conecta via WhatsApp Web
+- 🎬 **Detecção de Vídeos Novos**: Monitora novos uploads automaticamente
+- 📊 **Dashboard Completo**: Status detalhado do sistema
+- 🛡️ **Sistema Robusto**: Tratamento de erros e reconexão automática
+
+---
+
+## 🛠️ Instalação
+
+### Pré-requisitos
+
+- **Node.js** (versão 16 ou superior)
+- **NPM** (gerenciador de pacotes)
+- **Google Chrome** ou **Chromium** instalado
+- **Conexão estável com internet**
+
+### Passo a Passo
+
+1. **Clone ou baixe o projeto**
+   ```bash
+   # Se usando Git
+   git clone [URL-DO-REPOSITORIO]
+   cd disparador-pr-marcelo-oliveira
+   ```
+
+2. **Instale as dependências**
+   ```bash
+   npm install
+   ```
+
+3. **Configure sua API Key do YouTube** (opcional)
+   - Abra o arquivo `disparador.js`
+   - Localize a linha: `this.youtubeApiKey = "SUA_API_KEY_AQUI"`
+   - Substitua pela sua API Key (ou use a padrão fornecida)
+
+4. **Execute o sistema**
+   ```bash
+   npm start
+   ```
+
+---
+
+## 🚀 Como Usar
+
+### 1. Primeira Execução
+
+1. Execute o comando `npm start`
+2. Digite `menu` para ver todas as opções
+3. Use `conectar` ou `1` para conectar ao WhatsApp
+4. Escaneie o QR Code com seu WhatsApp
+5. Aguarde a mensagem "✅ CONECTADO COM SUCESSO!"
+
+### 2. Configurando Grupos
+
+1. Use `grupos` ou `4` para listar todos os grupos
+2. Use `ativar [nome]` ou `5 [nome]` para ativar um grupo
+   - Exemplo: `ativar Família`
+   - Exemplo: `ativar Igreja`
+
+### 3. Testando o Sistema
+
+1. Use `testar` ou `10` para verificar a conexão com o YouTube
+2. Use `enviar` ou `7` para fazer uma verificação manual
+3. Use `status` ou `3` para ver o status do sistema
+
+### 4. Agendamento Automático
+
+1. Use `agendar` ou `8` para ver opções de agendamento
+2. Exemplos de agendamento:
+   - `agendar 0 9,18 * * *` (9h e 18h todos os dias)
+   - `agendar */30 * * * *` (a cada 30 minutos)
+   - `agendar 0 8 * * 1-5` (8h de segunda a sexta)
+
+---
+
+## 📋 Comandos Disponíveis
+
+### 🔗 Conexão
+- `1` ou `conectar` - Conectar ao WhatsApp
+- `2` ou `desconectar` - Desconectar do WhatsApp
+- `3` ou `status` - Ver status da conexão
+
+### 📋 Grupos
+- `4` ou `grupos` - Listar todos os grupos
+- `5` ou `ativar [nome]` - Ativar grupo para receber vídeos
+- `6` ou `desativar [nome]` - Desativar grupo
+
+### 🤖 Automação
+- `7` ou `enviar` - Verificar e enviar vídeos novos
+- `8` ou `agendar` - Programar envios automáticos
+- `9` ou `agendamentos` - Ver programações ativas
+
+### 🛠️ Ferramentas
+- `10` ou `testar` - Testar busca de vídeos
+- `11` ou `limpar` - Resetar sessão do WhatsApp
+- `12` ou `reiniciar` - Reiniciar conexão
+
+### 📱 Outros
+- `menu` ou `ajuda` - Mostrar menu principal
+- `cls` ou `clear` - Limpar tela
+- `creditos` - Ver créditos do desenvolvedor
+- `0` ou `sair` - Encerrar sistema
+
+---
+
+## ⚙️ Configurações Avançadas
+
+### Personalização da Mensagem
+
+Para personalizar a mensagem enviada aos grupos, edite a função `sendVideoToGroup()` no arquivo `disparador.js`:
+
+```javascript
+const message = `🚨 *VÍDEO NOVO DO PR MARCELO OLIVEIRA!*\n\n🎬 *${videoData.title}*\n\n👉 *Assista agora:* ${videoData.link}\n\n🙏 Compartilhe com família e amigos!\n\n✨ *Deus abençoe!*`;
+```
+
+### Mudança de Canal
+
+Para monitorar outro canal do YouTube:
+
+1. Abra `disparador.js`
+2. Localize: `this.channelId = "UCh-ceOeY4WVgS8R0onTaXmw"`
+3. Substitua pelo ID do canal desejado
+
+### Intervalo de Verificação
+
+Os agendamentos usam formato **CRON**:
+- `minuto hora dia mês dia_da_semana`
+- `*` = qualquer valor
+- `0-6` = domingo a sábado
+- `,` = múltiplos valores
+- `-` = intervalo de valores
+
+---
+
+## 🔧 Solução de Problemas
+
+### Problema: QR Code não aparece
+**Solução**: 
+1. Use `limpar` para resetar a sessão
+2. Execute `reiniciar`
+3. Tente `conectar` novamente
+
+### Problema: "Erro ao buscar vídeo"
+**Solução**:
+1. Verifique sua conexão com internet
+2. Confirme se a API Key do YouTube está válida
+3. Use `testar` para verificar a conexão
+
+### Problema: Não envia para grupos
+**Solução**:
+1. Certifique-se que está conectado: `status`
+2. Verifique se os grupos estão ativos: `grupos`
+3. Ative os grupos necessários: `ativar [nome]`
+
+### Problema: Mensagem "Comando não encontrado"
+**Solução**:
+1. Digite `menu` para ver todos os comandos
+2. Use números (1-12) ou nomes dos comandos
+3. Exemplo: `1` ou `conectar`
+
+---
+
+## 📝 Arquivos do Projeto
+
+```
+disparador-pr-marcelo-oliveira/
+├── disparador.js          # Código principal
+├── package.json          # Dependências do projeto
+├── README.md            # Este arquivo
+├── bot_data.json        # Dados salvos (criado automaticamente)
+└── .wwebjs_auth/        # Sessão WhatsApp (criada automaticamente)
+```
+
+---
+
+## 🔒 Segurança e Privacidade
+
+- ✅ **Sessão Local**: Dados armazenados apenas no seu computador
+- ✅ **Sem Servidor**: Não envia dados para servidores externos
+- ✅ **Código Aberto**: Você pode revisar todo o código
+- ✅ **API Oficial**: Usa APIs oficiais do YouTube e WhatsApp Web
+
+---
+
+## 📞 Suporte
+
+### Em caso de dúvidas ou problemas:
+
+1. **Leia este README** completamente
+2. **Teste os comandos básicos** (`status`, `testar`)
+3. **Verifique os logs** no terminal
+4. **Use `creditos`** para informações de contato
+
+---
+
+## 🎯 Créditos
+
+**Desenvolvido com ❤️ por:**
+
+### 🏢 **WALLYSSON STUDIO DV**
+*© 2025 - Todos os direitos reservados*
+
+**Tecnologias Utilizadas:**
+- Node.js
+- whatsapp-web.js
+- YouTube API v3
+- Node Cron
+- Chalk (cores no terminal)
+
+---
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+
+---
+
+## 🔄 Atualizações
+
+**Versão 2.0.0** - Janeiro 2025
+- ✨ Interface completamente renovada
+- 🎯 Menu organizado em português
+- 🚀 Comandos simplificados
+- 📱 Melhor experiência do usuário
+- 🛡️ Sistema mais robusto
+
+---
+
+### 🙏 **Que Deus abençoe seu ministério!**
+
+*"Ide por todo o mundo e pregai o evangelho a toda criatura." - Marcos 16:15*
