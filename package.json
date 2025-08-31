@@ -1,34 +1,41 @@
 {
-  "name": "youtube-whatsapp-bot-webjs",
+  "name": "disparador-canal-pr-marcelo-oliveira",
   "version": "2.0.0",
-  "description": "Bot WhatsApp para enviar notificações de novos vídeos do YouTube usando whatsapp-web.js",
+  "description": "Disparador automático de vídeos do canal do PR Marcelo Oliveira para grupos do WhatsApp",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
     "dev": "nodemon bot.js",
-    "clean": "node -e \"const fs = require('fs'); if(fs.existsSync('./.wwebjs_auth')) fs.rmSync('./.wwebjs_auth', {recursive: true, force: true}); console.log('Sessão limpa!');\""
+    "install-deps": "npm install"
   },
   "keywords": [
     "whatsapp",
-    "bot",
     "youtube",
-    "whatsapp-web.js",
-    "agendamento",
-    "nodejs"
+    "bot",
+    "automation",
+    "disparador",
+    "pr-marcelo-oliveira"
   ],
-  "author": "Seu Nome",
+  "author": "Wallysson Studio DV 2025",
   "license": "MIT",
   "dependencies": {
-    "whatsapp-web.js": "^1.25.0",
-    "axios": "^1.6.0",
-    "chalk": "^4.1.2",
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode-terminal": "^0.12.0",
     "node-cron": "^3.0.3",
-    "qrcode-terminal": "^0.12.0"
+    "axios": "^1.6.2",
+    "chalk": "^4.1.2"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wallysson-studio-dv/disparador-pr-marcelo-oliveira"
+  },
+  "bugs": {
+    "url": "https://github.com/wallysson-studio-dv/disparador-pr-marcelo-oliveira/issues"
   }
 }
