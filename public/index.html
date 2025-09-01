@@ -470,7 +470,7 @@
             <div id="qrContainer" class="qr-container hidden">
                 <h3><i class="fas fa-qrcode"></i> Escaneie o QR Code</h3>
                 <p>Abra o WhatsApp no seu celular e escaneie o código abaixo:</p>
-                <img id="qrCode" class="qr-code" alt="QR Code">
+                <img id="qrCode" class="qr-code" alt="QR Code" src="">
             </div>
 
             <!-- Controles -->
@@ -503,7 +503,12 @@
 
             <!-- Logs -->
             <div class="logs-container">
-                <h3 style="color: white; margin-bottom: 15px;"><i class="fas fa-terminal"></i> Logs do Sistema</h3>
+                <h3 style="color: white; margin-bottom: 15px; position: relative;">
+                    <i class="fas fa-terminal"></i> Logs do Sistema
+                    <button id="clearLogsBtn" class="btn btn-secondary" style="position: absolute; top: -5px; right: 0; padding: 5px 10px; font-size: 12px;">
+                        <i class="fas fa-eraser"></i> Limpar
+                    </button>
+                </h3>
                 <div id="logs"></div>
             </div>
 
@@ -562,7 +567,8 @@
             cleanSessionBtn: document.getElementById('cleanSessionBtn'),
             scheduleText: document.getElementById('scheduleText'),
             customCron: document.getElementById('customCron'),
-            addScheduleBtn: document.getElementById('addScheduleBtn')
+            addScheduleBtn: document.getElementById('addScheduleBtn'),
+            clearLogsBtn: document.getElementById('clearLogsBtn')
         };
 
         // State
@@ -572,6 +578,155 @@
             groups: [],
             schedules: []
         };
+
+        // Utility Functions
+        function formatTimestamp() {
+            return new Date().toLocaleTimeString('pt-BR');
+        }
+
+        function addLog(message, type = 'info') {
+            const timestamp = formatTimestamp();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.innerHTML = `
+                <span class="log-timestamp">${timestamp}</span>
+                <span>${message}</span>
+            `;
+            elements.logs.appendChild(logEntry);
+            elements.logs.scrollTop = elements.logs.scrollHeight;
+        }
+
+        function clearLogs() {
+            elements.logs.innerHTML = '';
+            addLog('Logs limpos', 'info');
+        }
+
+        function showNotification(message, type = 'info', duration = 3000) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `<i class="fas fa-info-circle"></i> ${message}`;
+            document.body.appendChild(notification);
+
+            // Show notification
+            setTimeout(() => notification.classList.add('show'), 100);
+
+            // Hide and remove notification
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, duration);
+        }
+
+        function updateConnectionStatus(status) {
+            const statusEl = elements.connectionStatus;
+            statusEl.className = 'status-indicator';
+
+            switch(status) {
+                case 'connected':
+                    statusEl.classList.add('status-connected');
+                    statusEl.innerHTML = '<i class="fas fa-check-circle"></i> Conectado';
+                    currentState.connected = true;
+                    elements.connectBtn.disabled = true;
+                    elements.disconnectBtn.disabled = false;
+                    elements.qrContainer.classList.add('hidden');
+                    break;
+                case 'connecting':
+                    statusEl.classList.add('status-connecting');
+                    statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
+                    currentState.connected = false;
+                    elements.connectBtn.disabled = true;
+                    elements.disconnectBtn.disabled = true;
+                    break;
+                case 'disconnected':
+                    statusEl.classList.add('status-disconnected');
+                    statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Desconectado';
+                    currentState.connected = false;
+                    elements.connectBtn.disabled = false;
+                    elements.disconnectBtn.disabled = true;
+                    elements.qrContainer.classList.add('hidden');
+                    break;
+            }
+        }
+
+        function updateStatus(data) {
+            if (data.totalGroups !== undefined) {
+                elements.totalGroups.textContent = data.totalGroups;
+            }
+            if (data.activeGroups !== undefined) {
+                elements.activeGroups.textContent = `${data.activeGroups} ativos`;
+            }
+            if (data.autoScheduleEnabled !== undefined) {
+                currentState.autoScheduleEnabled = data.autoScheduleEnabled;
+                elements.autoScheduleStatus.textContent = data.autoScheduleEnabled ? 'Ativo' : 'Inativo';
+                elements.scheduleText.textContent = data.autoScheduleEnabled ? 'Desativar' : 'Ativar';
+            }
+            if (data.lastVideo !== undefined) {
+                elements.lastVideoStatus.textContent = data.lastVideo.slice(-8) || '-';
+            }
+            if (data.reconnectAttempts !== undefined) {
+                elements.reconnectAttempts.textContent = data.reconnectAttempts;
+            }
+        }
+
+        function updateGroups(groups) {
+            currentState.groups = groups;
+            elements.groupsList.innerHTML = '';
+
+            groups.forEach(group => {
+                const groupEl = document.createElement('div');
+                groupEl.className = `group-item ${group.active ? 'group-active' : ''}`;
+                groupEl.innerHTML = `
+                    <div class="group-info">
+                        <div class="group-name">${group.name}</div>
+                        <div class="group-status">${group.active ? 'Ativo' : 'Inativo'} • ${group.participants || 0} membros</div>
+                    </div>
+                    <button 
+                        class="toggle-btn ${group.active ? 'toggle-active' : 'toggle-inactive'}"
+                        onclick="toggleGroup('${group.id}')"
+                    >
+                        ${group.active ? 'Desativar' : 'Ativar'}
+                    </button>
+                `;
+                elements.groupsList.appendChild(groupEl);
+            });
+        }
+
+        function updateSchedules(schedules) {
+            currentState.schedules = schedules;
+            elements.schedulesList.innerHTML = '';
+
+            schedules.forEach((schedule, index) => {
+                const scheduleEl = document.createElement('div');
+                scheduleEl.className = 'schedule-item';
+                scheduleEl.innerHTML = `
+                    <div>
+                        <strong>${schedule.description}</strong><br>
+                        <small>${schedule.cron}</small>
+                    </div>
+                    <button 
+                        class="btn btn-danger" 
+                        style="padding: 5px 10px; font-size: 12px;"
+                        onclick="removeSchedule(${index})"
+                    >
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                elements.schedulesList.appendChild(scheduleEl);
+            });
+        }
+
+        function isValidCron(cron) {
+            const cronParts = cron.trim().split(/\s+/);
+            return cronParts.length === 5 || cronParts.length === 6;
+        }
+
+        function toggleGroup(groupId) {
+            socket.emit('toggle_group', groupId);
+        }
+
+        function removeSchedule(index) {
+            socket.emit('remove_schedule', index);
+        }
 
         // Event Listeners
         elements.connectBtn.addEventListener('click', () => {
@@ -650,6 +805,10 @@
             }
         });
 
+        elements.clearLogsBtn.addEventListener('click', () => {
+            clearLogs();
+        });
+
         // Socket Events
         socket.on('connect', () => {
             addLog('Conectado ao servidor', 'success');
@@ -670,298 +829,124 @@
             addLog('Iniciando conexão com WhatsApp...', 'info');
         });
 
-        socket.on('connected', (data) => {
+        socket.on('connected', () => {
             updateConnectionStatus('connected');
-            elements.qrContainer.classList.add('hidden');
-            elements.connectBtn.disabled = false;
-            elements.disconnectBtn.disabled = false;
-            updateStatus(data);
             addLog('WhatsApp conectado com sucesso!', 'success');
             showNotification('WhatsApp conectado!', 'success');
         });
 
-        socket.on('disconnected', (data) => {
+        socket.on('disconnected', () => {
             updateConnectionStatus('disconnected');
-            elements.qrContainer.classList.add('hidden');
-            elements.connectBtn.disabled = false;
-            elements.disconnectBtn.disabled = false;
-            addLog(`Desconectado: ${data.reason}`, 'warning');
+            addLog('WhatsApp desconectado', 'warning');
             showNotification('WhatsApp desconectado!', 'warning');
         });
 
-        socket.on('qr_code', (data) => {
-            elements.qrCode.src = data.qrCode;
+        socket.on('qr', (qrData) => {
+            elements.qrCode.src = qrData;
             elements.qrContainer.classList.remove('hidden');
-            addLog('QR Code gerado! Escaneie para conectar.', 'info');
-            showNotification('QR Code gerado! Escaneie com seu WhatsApp.', 'info');
+            addLog('QR Code gerado - Escaneie para conectar', 'info');
+            showNotification('QR Code gerado! Escaneie para conectar.', 'info');
         });
 
         socket.on('log', (data) => {
             addLog(data.message, data.type);
         });
 
-        socket.on('error', (data) => {
-            addLog(data.message, 'error');
-            showNotification(data.message, 'error');
+        socket.on('notification', (data) => {
+            showNotification(data.message, data.type);
         });
 
-        socket.on('groups_loaded', (data) => {
-            currentState.groups = data.groups;
-            updateGroupsList(data.groups);
-            addLog(`${data.groups.length} grupos carregados`, 'info');
+        socket.on('groups_updated', (groups) => {
+            updateGroups(groups);
+            addLog(`Lista de grupos atualizada: ${groups.length} grupos encontrados`, 'info');
         });
 
-        socket.on('group_updated', (data) => {
-            updateGroupItem(data.groupId, data.active);
-            const group = currentState.groups.find(g => g.id === data.groupId);
-            if (group) {
-                group.active = data.active;
-                addLog(`Grupo ${group.name} ${data.active ? 'ativado' : 'desativado'}`, 'info');
-            }
-        });
-
-        socket.on('auto_schedule_changed', (data) => {
-            currentState.autoScheduleEnabled = data.enabled;
-            elements.autoScheduleStatus.textContent = data.enabled ? 'Ativo' : 'Inativo';
-            elements.scheduleText.textContent = data.enabled ? 'Desativar' : 'Ativar';
-            addLog(`Agendamento automático ${data.enabled ? 'ativado' : 'desativado'}`, 'info');
-            showNotification(`Agendamento ${data.enabled ? 'ativado' : 'desativado'}!`, 'success');
+        socket.on('schedules_updated', (schedules) => {
+            updateSchedules(schedules);
+            addLog(`Agendamentos atualizados: ${schedules.length} agendamentos ativos`, 'info');
         });
 
         socket.on('video_sent', (data) => {
-            addLog(`✅ Vídeo enviado para ${data.sentCount}/${data.totalGroups} grupos!`, 'success');
-            showNotification(`Vídeo enviado para ${data.sentCount} grupos!`, 'success');
-            if (data.videoData) {
-                elements.lastVideoStatus.textContent = data.videoData.id || 'Enviado';
+            addLog(`Vídeo enviado: ${data.title}`, 'success');
+            showNotification(`Vídeo enviado para ${data.groups} grupos!`, 'success');
+        });
+
+        socket.on('video_checked', (data) => {
+            if (data.newVideo) {
+                addLog(`Novo vídeo encontrado: ${data.title}`, 'success');
+                showNotification('Novo vídeo encontrado e enviado!', 'success');
+            } else {
+                addLog('Nenhum vídeo novo encontrado', 'info');
             }
+        });
+
+        socket.on('error', (error) => {
+            addLog(`Erro: ${error.message}`, 'error');
+            showNotification(error.message, 'error');
+            
+            // Re-enable buttons on error
+            elements.connectBtn.disabled = false;
+            elements.disconnectBtn.disabled = true;
+            elements.restartBtn.disabled = false;
+            elements.checkVideosBtn.disabled = false;
+            elements.forceSendBtn.disabled = false;
+            elements.testVideoBtn.disabled = false;
+            elements.cleanSessionBtn.disabled = false;
+        });
+
+        socket.on('session_cleaned', () => {
+            addLog('Sessão limpa com sucesso', 'success');
+            showNotification('Sessão removida! Reconecte para usar o bot.', 'success');
+            updateConnectionStatus('disconnected');
+        });
+
+        socket.on('reconnecting', (attempt) => {
+            addLog(`Tentativa de reconexão #${attempt}`, 'warning');
+            updateConnectionStatus('connecting');
         });
 
         socket.on('video_test', (data) => {
-            addLog(`🧪 Teste: "${data.videoData.title}" - ${data.isNew ? 'NOVO' : 'JÁ ENVIADO'}`, 'info');
-            showNotification(`Teste concluído: ${data.isNew ? 'Novo vídeo encontrado' : 'Nenhum vídeo novo'}`, 'info');
+            if (data.success) {
+                addLog(`Teste YouTube OK: ${data.videos} vídeos encontrados`, 'success');
+                showNotification('Conexão com YouTube funcionando!', 'success');
+            } else {
+                addLog(`Erro no teste YouTube: ${data.error}`, 'error');
+                showNotification('Erro na conexão com YouTube!', 'error');
+            }
         });
 
-        socket.on('schedule_created', (data) => {
-            currentState.schedules.push(data);
-            addScheduleToList(data);
-            addLog(`Agendamento criado: ${data.cron}`, 'success');
-            showNotification('Agendamento criado!', 'success');
+        socket.on('schedule_created', (schedule) => {
+            addLog(`Agendamento criado: ${schedule.description}`, 'success');
+            showNotification('Agendamento criado com sucesso!', 'success');
         });
 
-        socket.on('schedule_removed', (data) => {
-            currentState.schedules = currentState.schedules.filter(s => s.id !== data.id);
-            removeScheduleFromList(data.id);
-            addLog(`Agendamento removido`, 'warning');
-            showNotification('Agendamento removido!', 'warning');
+        socket.on('schedule_removed', (index) => {
+            addLog(`Agendamento removido: índice ${index}`, 'info');
+            showNotification('Agendamento removido!', 'info');
         });
 
-        socket.on('reconnect_attempt', (data) => {
-            elements.reconnectAttempts.textContent = data.attempts;
-            addLog(`Tentativa de reconexão ${data.attempts}`, 'warning');
+        socket.on('group_toggled', (data) => {
+            addLog(`Grupo ${data.name}: ${data.active ? 'ativado' : 'desativado'}`, 'info');
+            showNotification(`Grupo ${data.active ? 'ativado' : 'desativado'}!`, 'info');
         });
 
-        socket.on('video_found', (data) => {
-            addLog(`🔍 Novo vídeo encontrado: "${data.title}"`, 'info');
-            elements.lastVideoStatus.textContent = data.id;
+        socket.on('force_send_complete', (data) => {
+            addLog(`Envio forçado concluído para ${data.groups} grupos`, 'success');
+            showNotification(`Vídeo enviado para ${data.groups} grupos!`, 'success');
         });
 
-        // Functions
-        function updateConnectionStatus(status) {
-            const statusElement = elements.connectionStatus;
-            statusElement.className = `status-indicator status-${status}`;
-            currentState.connected = status === 'connected';
-            
-            switch (status) {
-                case 'connected':
-                    statusElement.innerHTML = '<i class="fas fa-check-circle"></i> Conectado';
-                    break;
-                case 'connecting':
-                    statusElement.innerHTML = '<div class="loading"></div> Conectando...';
-                    break;
-                case 'disconnected':
-                    statusElement.innerHTML = '<i class="fas fa-times-circle"></i> Desconectado';
-                    break;
-            }
-        }
-
-        function updateStatus(data) {
-            elements.totalGroups.textContent = data.totalGroups || 0;
-            elements.activeGroups.textContent = `${data.activeGroups || 0} ativos`;
-            elements.autoScheduleStatus.textContent = data.autoScheduleEnabled ? 'Ativo' : 'Inativo';
-            elements.scheduleText.textContent = data.autoScheduleEnabled ? 'Desativar' : 'Ativar';
-            elements.lastVideoStatus.textContent = data.lastVideo || '-';
-            elements.reconnectAttempts.textContent = data.reconnectAttempts || 0;
-            
-            currentState.autoScheduleEnabled = data.autoScheduleEnabled;
-        }
-
-        function addLog(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString('pt-BR');
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry log-${type}`;
-            logEntry.innerHTML = `
-                <span class="log-timestamp">[${timestamp}]</span>
-                ${message}
-            `;
-            
-            elements.logs.insertBefore(logEntry, elements.logs.firstChild);
-            
-            // Limitar logs a 100 entradas
-            while (elements.logs.children.length > 100) {
-                elements.logs.removeChild(elements.logs.lastChild);
-            }
-        }
-
-        function updateGroupsList(groups) {
-            elements.groupsList.innerHTML = '';
-            
-            groups.forEach(group => {
-                const groupElement = document.createElement('div');
-                groupElement.className = `group-item ${group.active ? 'group-active' : ''}`;
-                groupElement.innerHTML = `
-                    <div class="group-info">
-                        <div class="group-name">${group.name}</div>
-                        <div class="group-status">${group.participants || 0} participantes</div>
-                    </div>
-                    <button class="toggle-btn ${group.active ? 'toggle-active' : 'toggle-inactive'}" 
-                            data-group-id="${group.id}">
-                        ${group.active ? 'Ativo' : 'Inativo'}
-                    </button>
-                `;
-                
-                const toggleBtn = groupElement.querySelector('.toggle-btn');
-                toggleBtn.addEventListener('click', () => {
-                    socket.emit('toggle_group', { groupId: group.id, active: !group.active });
-                });
-                
-                elements.groupsList.appendChild(groupElement);
-            });
-        }
-
-        function updateGroupItem(groupId, active) {
-            const groupElement = elements.groupsList.querySelector(`[data-group-id="${groupId}"]`);
-            if (groupElement) {
-                const groupItem = groupElement.closest('.group-item');
-                const toggleBtn = groupElement;
-                
-                groupItem.className = `group-item ${active ? 'group-active' : ''}`;
-                toggleBtn.className = `toggle-btn ${active ? 'toggle-active' : 'toggle-inactive'}`;
-                toggleBtn.textContent = active ? 'Ativo' : 'Inativo';
-            }
-        }
-
-        function addScheduleToList(schedule) {
-            const scheduleElement = document.createElement('div');
-            scheduleElement.className = 'schedule-item';
-            scheduleElement.setAttribute('data-schedule-id', schedule.id);
-            scheduleElement.innerHTML = `
-                <div>
-                    <strong>${schedule.cron}</strong>
-                    <small style="display: block; color: #666;">${formatCronDescription(schedule.cron)}</small>
-                </div>
-                <button class="btn btn-danger" onclick="removeSchedule('${schedule.id}')">
-                    <i class="fas fa-trash"></i> Remover
-                </button>
-            `;
-            elements.schedulesList.appendChild(scheduleElement);
-        }
-
-        function removeScheduleFromList(scheduleId) {
-            const scheduleElement = elements.schedulesList.querySelector(`[data-schedule-id="${scheduleId}"]`);
-            if (scheduleElement) {
-                scheduleElement.remove();
-            }
-        }
-
-        function removeSchedule(scheduleId) {
-            if (confirm('Tem certeza que deseja remover este agendamento?')) {
-                socket.emit('remove_schedule', { id: scheduleId });
-            }
-        }
-
-        function formatCronDescription(cron) {
-            // Função simples para converter cron em descrição legível
-            const parts = cron.split(' ');
-            if (parts.length !== 5) return cron;
-            
-            const [minute, hour, day, month, weekday] = parts;
-            
-            if (minute === '0' && hour !== '*' && day === '*' && month === '*' && weekday === '*') {
-                return `Todos os dias às ${hour}:00`;
-            }
-            
-            if (minute !== '*' && hour !== '*' && day === '*' && month === '*' && weekday === '*') {
-                return `Todos os dias às ${hour}:${minute.padStart(2, '0')}`;
-            }
-            
-            return 'Agendamento personalizado';
-        }
-
-        function isValidCron(cron) {
-            // Validação básica de formato cron
-            const parts = cron.split(' ');
-            if (parts.length !== 5) return false;
-            
-            const [minute, hour, day, month, weekday] = parts;
-            
-            // Validações básicas
-            if (minute !== '*' && (isNaN(minute) || minute < 0 || minute > 59)) return false;
-            if (hour !== '*' && (isNaN(hour) || hour < 0 || hour > 23)) return false;
-            if (day !== '*' && (isNaN(day) || day < 1 || day > 31)) return false;
-            if (month !== '*' && (isNaN(month) || month < 1 || month > 12)) return false;
-            if (weekday !== '*' && (isNaN(weekday) || weekday < 0 || weekday > 6)) return false;
-            
-            return true;
-        }
-
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <i class="fas fa-${getIconForType(type)}"></i>
-                ${message}
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // Mostrar notificação
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 100);
-            
-            // Remover notificação após 4 segundos
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 300);
-            }, 4000);
-        }
-
-        function getIconForType(type) {
-            const icons = {
-                'success': 'check-circle',
-                'error': 'exclamation-circle',
-                'warning': 'exclamation-triangle',
-                'info': 'info-circle'
-            };
-            return icons[type] || 'info-circle';
-        }
-
-        // Auto-refresh status periodicamente
+        // Periodic status updates
         setInterval(() => {
             if (socket.connected) {
                 socket.emit('get_status');
             }
-        }, 30000); // A cada 30 segundos
+        }, 30000); // Update every 30 seconds
 
-        // Inicialização
-        window.addEventListener('load', () => {
-            addLog('Painel de controle iniciado', 'info');
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            addLog('Interface carregada - Pronto para uso', 'success');
             
-            // Solicitar status inicial
+            // Request initial status
             if (socket.connected) {
                 socket.emit('get_status');
                 socket.emit('get_groups');
@@ -969,135 +954,183 @@
             }
         });
 
-        // Tratamento de erros globais
-        window.addEventListener('error', (event) => {
-            addLog(`Erro no cliente: ${event.message}`, 'error');
-        });
-
-        // Detectar quando o usuário sai da página
-        window.addEventListener('beforeunload', (event) => {
-            if (socket.connected) {
-                socket.disconnect();
+        // Handle page visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && socket.connected) {
+                socket.emit('get_status');
             }
         });
 
-        // Adicionar event listeners para teclas de atalho
-        document.addEventListener('keydown', (event) => {
-            // Ctrl + R para reiniciar
-            if (event.ctrlKey && event.key === 'r') {
-                event.preventDefault();
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+R para reiniciar
+            if (e.ctrlKey && e.key === 'r' && currentState.connected) {
+                e.preventDefault();
                 elements.restartBtn.click();
             }
             
-            // Ctrl + T para testar vídeo
-            if (event.ctrlKey && event.key === 't') {
-                event.preventDefault();
-                elements.testVideoBtn.click();
+            // Ctrl+D para desconectar
+            if (e.ctrlKey && e.key === 'd' && currentState.connected) {
+                e.preventDefault();
+                elements.disconnectBtn.click();
             }
             
-            // Ctrl + Enter para verificar vídeos
-            if (event.ctrlKey && event.key === 'Enter') {
-                event.preventDefault();
-                elements.checkVideosBtn.click();
+            // Ctrl+Shift+C para conectar
+            if (e.ctrlKey && e.shiftKey && e.key === 'C' && !currentState.connected) {
+                e.preventDefault();
+                elements.connectBtn.click();
             }
         });
 
-        // Função para limpar logs
-        function clearLogs() {
-            elements.logs.innerHTML = '';
-            addLog('Logs limpos', 'info');
-        }
-
-        // Adicionar botão para limpar logs
-        const clearLogsBtn = document.createElement('button');
-        clearLogsBtn.className = 'btn btn-secondary';
-        clearLogsBtn.style.position = 'absolute';
-        clearLogsBtn.style.top = '10px';
-        clearLogsBtn.style.right = '10px';
-        clearLogsBtn.innerHTML = '<i class="fas fa-eraser"></i> Limpar';
-        clearLogsBtn.onclick = clearLogs;
+        // Auto-scroll logs to bottom
+        const logsObserver = new MutationObserver(() => {
+            elements.logs.scrollTop = elements.logs.scrollHeight;
+        });
         
-        const logsContainer = document.querySelector('.logs-container');
-        logsContainer.style.position = 'relative';
-        logsContainer.appendChild(clearLogsBtn);
-
-        // Scroll automático nos logs
-        const logsElement = elements.logs;
-        const observer = new MutationObserver(() => {
-            logsElement.scrollTop = 0; // Scroll para o topo (logs mais recentes)
+        logsObserver.observe(elements.logs, { 
+            childList: true, 
+            subtree: true 
         });
-        observer.observe(logsElement, { childList: true });
 
-        // Adicionar indicador de status na aba do navegador
-        function updateFavicon(status) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 32;
-            canvas.height = 32;
-            const ctx = canvas.getContext('2d');
-            
-            // Cor baseada no status
-            const colors = {
-                'connected': '#4CAF50',
-                'connecting': '#FF9800',
-                'disconnected': '#f44336'
-            };
-            
-            ctx.fillStyle = colors[status] || '#f44336';
-            ctx.fillRect(0, 0, 32, 32);
-            
-            // Adicionar ícone
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(status === 'connected' ? '✓' : status === 'connecting' ? '...' : '✗', 16, 22);
-            
-            // Atualizar favicon
-            const favicon = document.querySelector('link[rel="icon"]') || document.createElement('link');
-            favicon.rel = 'icon';
-            favicon.href = canvas.toDataURL();
-            if (!document.querySelector('link[rel="icon"]')) {
-                document.head.appendChild(favicon);
+        // Connection health check
+        let connectionCheckInterval = setInterval(() => {
+            if (!socket.connected) {
+                addLog('Tentando reconectar ao servidor...', 'warning');
+                socket.connect();
+            }
+        }, 10000); // Check every 10 seconds
+
+        // Clear interval on page unload
+        window.addEventListener('beforeunload', () => {
+            clearInterval(connectionCheckInterval);
+        });
+
+        // Smooth scroll for mobile
+        if ('scrollBehavior' in document.documentElement.style) {
+            document.documentElement.style.scrollBehavior = 'smooth';
+        }
+
+        // Add loading states for buttons
+        function setButtonLoading(button, loading = true) {
+            if (loading) {
+                button.dataset.originalText = button.innerHTML;
+                button.innerHTML = '<div class="loading"></div> Processando...';
+                button.disabled = true;
+            } else {
+                button.innerHTML = button.dataset.originalText;
+                button.disabled = false;
             }
         }
 
-        // Atualizar favicon quando status mudar
-        const originalUpdateConnectionStatus = updateConnectionStatus;
-        updateConnectionStatus = function(status) {
-            originalUpdateConnectionStatus(status);
-            updateFavicon(status);
+        // Enhanced button handlers with loading states
+        ['connectBtn', 'disconnectBtn', 'restartBtn', 'checkVideosBtn', 'forceSendBtn', 'testVideoBtn', 'cleanSessionBtn'].forEach(btnId => {
+            const btn = elements[btnId];
+            const originalHandler = btn.onclick;
             
-            // Atualizar título da página
-            document.title = `YouTube Bot - ${status === 'connected' ? 'Conectado' : status === 'connecting' ? 'Conectando...' : 'Desconectado'}`;
+            btn.addEventListener('click', function(e) {
+                if (!this.disabled) {
+                    setButtonLoading(this, true);
+                    
+                    // Auto-restore button state after timeout
+                    setTimeout(() => {
+                        if (this.disabled) {
+                            setButtonLoading(this, false);
+                        }
+                    }, 10000);
+                }
+            });
+        });
+
+        // Enhanced error handling
+        window.addEventListener('error', (e) => {
+            addLog(`Erro JavaScript: ${e.message}`, 'error');
+            console.error('Error caught:', e);
+        });
+
+        // Handle socket connection errors
+        socket.on('connect_error', (error) => {
+            addLog(`Erro de conexão: ${error.message}`, 'error');
+            showNotification('Erro de conexão com servidor!', 'error');
+        });
+
+        // Service worker registration for PWA capabilities
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try {
+                    // Note: You would need to create a service worker file
+                    // const registration = await navigator.serviceWorker.register('/sw.js');
+                    // addLog('Service Worker registrado', 'success');
+                } catch (error) {
+                    // addLog('Erro ao registrar Service Worker', 'warning');
+                }
+            });
+        }
+
+        // Add tooltips for better UX
+        const tooltips = {
+            connectBtn: 'Conectar ao WhatsApp (Ctrl+Shift+C)',
+            disconnectBtn: 'Desconectar do WhatsApp (Ctrl+D)',
+            restartBtn: 'Reiniciar conexão (Ctrl+R)',
+            checkVideosBtn: 'Verificar novos vídeos manualmente',
+            forceSendBtn: 'Enviar último vídeo novamente',
+            testVideoBtn: 'Testar conexão com YouTube',
+            cleanSessionBtn: 'Limpar dados de autenticação',
+            toggleScheduleBtn: 'Ativar/desativar envios automáticos'
         };
 
-        // Sistema de heartbeat para verificar conexão
-        let heartbeatInterval;
-        
-        function startHeartbeat() {
-            heartbeatInterval = setInterval(() => {
-                if (socket.connected) {
-                    socket.emit('heartbeat');
-                }
-            }, 10000); // A cada 10 segundos
-        }
+        Object.entries(tooltips).forEach(([id, text]) => {
+            const element = elements[id];
+            if (element) {
+                element.title = text;
+            }
+        });
 
-        function stopHeartbeat() {
-            if (heartbeatInterval) {
-                clearInterval(heartbeatInterval);
+        // Network status indicator
+        function updateNetworkStatus() {
+            const isOnline = navigator.onLine;
+            if (!isOnline) {
+                showNotification('Conexão perdida! Algumas funcionalidades podem não funcionar.', 'error', 5000);
+                addLog('Conexão de rede perdida', 'error');
             }
         }
 
-        socket.on('connect', () => {
-            startHeartbeat();
+        window.addEventListener('online', () => {
+            showNotification('Conexão restaurada!', 'success');
+            addLog('Conexão de rede restaurada', 'success');
         });
 
-        socket.on('disconnect', () => {
-            stopHeartbeat();
-        });
+        window.addEventListener('offline', updateNetworkStatus);
 
-        socket.on('heartbeat', () => {
-            // Resposta do heartbeat - conexão OK
-        });
+        // Performance monitoring
+        if (window.performance && window.performance.mark) {
+            window.performance.mark('app-start');
+            
+            window.addEventListener('load', () => {
+                window.performance.mark('app-loaded');
+                window.performance.measure('app-load-time', 'app-start', 'app-loaded');
+                
+                const measure = window.performance.getEntriesByName('app-load-time')[0];
+                addLog(`Interface carregada em ${Math.round(measure.duration)}ms`, 'info');
+            });
+        }
+
+        // Memory usage monitoring (Chrome only)
+        if (window.performance && window.performance.memory) {
+            setInterval(() => {
+                const memory = window.performance.memory;
+                const used = Math.round(memory.usedJSHeapSize / 1024 / 1024);
+                const total = Math.round(memory.totalJSHeapSize / 1024 / 1024);
+                
+                // Log if memory usage is high
+                if (used > 100) {
+                    addLog(`Uso de memória: ${used}MB/${total}MB`, 'warning');
+                }
+            }, 300000); // Check every 5 minutes
+        }
+
+        // Final initialization
+        addLog('Sistema inicializado - Todas as funcionalidades carregadas', 'success');
+        showNotification('Sistema carregado com sucesso!', 'success', 2000);
     </script>
 </body>
 </html>
