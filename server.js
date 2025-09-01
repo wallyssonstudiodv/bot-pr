@@ -37,7 +37,7 @@ class YouTubeWhatsAppBotServer {
         this.authDir = './auth_info_baileys';
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
-        this.reconnectDelay = 10000; // 10 segundos
+        this.reconnectDelay = 10000;
         
         this.setupExpress();
         this.setupSocket();
@@ -56,20 +56,10 @@ class YouTubeWhatsAppBotServer {
         this.io.on('connection', (socket) => {
             console.log('Cliente conectado:', socket.id);
             
-            // Envia status atual para o cliente que se conectou
-            socket.emit('status', {
-                isConnected: this.isConnected,
-                isConnecting: this.isConnecting,
-                connectionState: this.connectionState,
-                autoScheduleEnabled: this.autoScheduleEnabled,
-                qrCode: this.qrCode,
-                totalGroups: this.groups.size,
-                activeGroups: Array.from(this.groups.values()).filter(g => g.active).length,
-                lastVideoId: this.lastVideoId,
-                reconnectAttempts: this.reconnectAttempts
-            });
-
-            // Eventos do socket
+            // Envia status completo para o cliente conectado
+            this.emitStatus();
+            
+            // CORRIGIDO: Eventos do socket com nomes padronizados
             socket.on('connect_whatsapp', () => {
                 this.connectWhatsApp();
             });
@@ -78,12 +68,8 @@ class YouTubeWhatsAppBotServer {
                 this.disconnectWhatsApp();
             });
 
-            socket.on('activate_group', (groupName) => {
-                this.activateGroup(groupName);
-            });
-
-            socket.on('deactivate_group', (groupName) => {
-                this.deactivateGroup(groupName);
+            socket.on('restart_connection', () => {
+                this.restartConnection();
             });
 
             socket.on('check_videos', () => {
@@ -118,79 +104,83 @@ class YouTubeWhatsAppBotServer {
                 this.removeSchedule(scheduleId);
             });
 
-            socket.on('restart_connection', () => {
-                this.restartConnection();
-            });
-
-            // EVENTOS ADICIONADOS PARA CORRIGIR O QR CODE
+            // CORRIGIDO: Eventos de status e dados
             socket.on('get_status', () => {
-                socket.emit('status', {
-                    isConnected: this.isConnected,
-                    isConnecting: this.isConnecting,
-                    connectionState: this.connectionState,
-                    autoScheduleEnabled: this.autoScheduleEnabled,
-                    qrCode: this.qrCode,
-                    totalGroups: this.groups.size,
-                    activeGroups: Array.from(this.groups.values()).filter(g => g.active).length,
-                    lastVideoId: this.lastVideoId,
-                    reconnectAttempts: this.reconnectAttempts
-                });
+                this.emitStatus();
             });
 
             socket.on('get_groups', () => {
-                if (this.groups.size > 0) {
-                    socket.emit('groups_loaded', {
-                        groups: Array.from(this.groups.entries()).map(([id, data]) => ({
-                            id,
-                            name: data.name,
-                            active: data.active,
-                            participants: data.participants
-                        }))
-                    });
-                }
+                this.emitGroups();
             });
 
             socket.on('get_schedules', () => {
-                const schedulesArray = Array.from(this.schedules.entries()).map(([id, data]) => ({
-                    id,
-                    cron: data.cron,
-                    type: data.type,
-                    description: data.description,
-                    created: data.created
-                }));
-                socket.emit('schedules_loaded', schedulesArray);
+                this.emitSchedules();
             });
 
-            socket.on('toggle_group', (data) => {
-                const group = this.groups.get(data.groupId);
+            // CORRIGIDO: Toggle de grupo
+            socket.on('toggle_group', (groupId) => {
+                const group = this.groups.get(groupId);
                 if (group) {
-                    group.active = data.active;
+                    group.active = !group.active;
                     this.saveData();
-                    this.io.emit('group_updated', { groupId: data.groupId, active: data.active });
+                    this.emitGroups();
                     this.io.emit('log', { 
-                        message: `Grupo "${group.name}" foi ${data.active ? 'ATIVADO' : 'DESATIVADO'}!`, 
-                        type: data.active ? 'success' : 'info' 
+                        message: `Grupo "${group.name}" foi ${group.active ? 'ATIVADO' : 'DESATIVADO'}!`, 
+                        type: group.active ? 'success' : 'info' 
                     });
                 }
             });
 
-            socket.on('heartbeat', () => {
-                socket.emit('heartbeat');
-            });
-
-            socket.on('remove_schedule', (data) => {
-                this.removeSchedule(data.id);
+            socket.on('disconnect', () => {
+                console.log('Cliente desconectado:', socket.id);
             });
         });
     }
 
+    // NOVO: Método para emitir status completo
+    emitStatus() {
+        this.io.emit('status', {
+            connected: this.isConnected,
+            connecting: this.isConnecting,
+            connectionState: this.connectionState,
+            autoScheduleEnabled: this.autoScheduleEnabled,
+            totalGroups: this.groups.size,
+            activeGroups: Array.from(this.groups.values()).filter(g => g.active).length,
+            lastVideo: this.lastVideoId,
+            reconnectAttempts: this.reconnectAttempts
+        });
+    }
+
+    // NOVO: Método para emitir grupos
+    emitGroups() {
+        const groupsArray = Array.from(this.groups.entries()).map(([id, data]) => ({
+            id,
+            name: data.name,
+            active: data.active,
+            participants: data.participants || 0
+        }));
+        
+        this.io.emit('groups_updated', groupsArray);
+    }
+
+    // NOVO: Método para emitir agendamentos
+    emitSchedules() {
+        const schedulesArray = Array.from(this.schedules.entries()).map(([id, data]) => ({
+            id,
+            cron: data.cron,
+            type: data.type,
+            description: data.description,
+            created: data.created
+        }));
+        
+        this.io.emit('schedules_updated', schedulesArray);
+    }
+
     setupRoutes() {
-        // Página principal
         this.app.get('/', (req, res) => {
             res.sendFile(path.join(__dirname, 'public', 'index.html'));
         });
 
-        // API Routes
         this.app.get('/api/status', (req, res) => {
             res.json({
                 isConnected: this.isConnected,
@@ -204,41 +194,6 @@ class YouTubeWhatsAppBotServer {
             });
         });
 
-        this.app.get('/api/groups', (req, res) => {
-            const groupsArray = Array.from(this.groups.entries()).map(([id, data]) => ({
-                id,
-                name: data.name,
-                active: data.active
-            }));
-            res.json(groupsArray);
-        });
-
-        this.app.get('/api/schedules', (req, res) => {
-            const schedulesArray = Array.from(this.schedules.entries()).map(([id, data]) => ({
-                id,
-                cron: data.cron,
-                type: data.type,
-                description: data.description,
-                created: data.created
-            }));
-            res.json(schedulesArray);
-        });
-
-        this.app.post('/api/connect', async (req, res) => {
-            try {
-                await this.connectWhatsApp();
-                res.json({ success: true });
-            } catch (error) {
-                res.status(500).json({ error: error.message });
-            }
-        });
-
-        this.app.post('/api/disconnect', (req, res) => {
-            this.disconnectWhatsApp();
-            res.json({ success: true });
-        });
-
-        // Health check endpoint
         this.app.get('/health', (req, res) => {
             res.json({
                 status: 'ok',
@@ -264,11 +219,15 @@ class YouTubeWhatsAppBotServer {
         }
 
         this.isConnecting = true;
+        this.connectionState = 'connecting';
+        
+        // CORRIGIDO: Emitir eventos corretos
         this.io.emit('connecting');
+        this.emitStatus();
         this.io.emit('log', { message: 'Iniciando conexão com WhatsApp (Baileys)...', type: 'info' });
 
         try {
-            // Garantir que o diretório de autenticação existe
+            // Garantir que o diretório existe
             if (!fs.existsSync(this.authDir)) {
                 fs.mkdirSync(this.authDir, { recursive: true });
             }
@@ -280,8 +239,8 @@ class YouTubeWhatsAppBotServer {
 
             this.sock = makeWASocket({
                 version,
-                logger: P({ level: 'silent' }), // Log silencioso
-                printQRInTerminal: false,
+                logger: P({ level: 'silent' }),
+                printQRInTerminal: false, // IMPORTANTE: Sempre false
                 auth: {
                     creds: state.creds,
                     keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' }))
@@ -294,10 +253,11 @@ class YouTubeWhatsAppBotServer {
                 syncFullHistory: false,
                 fireInitQueries: false,
                 emitOwnEvents: true,
-                maxMsgRetryCount: 5,
-                retryRequestDelayMs: 250,
-                msgRetryCounterMap: {},
-                generateHighQualityLinkPreview: false
+                generateHighQualityLinkPreview: false,
+                // ADICIONADO: Configurações para melhor estabilidade
+                getMessage: async (key) => {
+                    return { conversation: 'Bot message' };
+                }
             });
 
             this.setupBaileysEvents(saveCreds);
@@ -305,6 +265,8 @@ class YouTubeWhatsAppBotServer {
         } catch (error) {
             console.error('Erro na inicialização:', error);
             this.isConnecting = false;
+            this.connectionState = 'close';
+            this.emitStatus();
             this.io.emit('error', { message: 'Erro na conexão: ' + error.message });
         }
     }
@@ -315,17 +277,31 @@ class YouTubeWhatsAppBotServer {
         this.sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             
-            console.log('Connection update:', connection);
-            this.connectionState = connection;
+            console.log('Connection update:', connection, 'QR:', !!qr);
+            this.connectionState = connection || this.connectionState;
             
+            // CORRIGIDO: QR Code handling
             if (qr) {
-                console.log('QR Code gerado');
+                console.log('🔲 QR Code gerado');
                 try {
-                    this.qrCode = await qrcode.toDataURL(qr);
-                    this.io.emit('qr_code', { qrCode: this.qrCode });
+                    const qrDataURL = await qrcode.toDataURL(qr, {
+                        width: 300,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    });
+                    
+                    this.qrCode = qrDataURL;
+                    
+                    // CORRIGIDO: Emitir com o nome correto esperado pelo frontend
+                    this.io.emit('qr', qrDataURL);
                     this.io.emit('log', { message: 'QR Code gerado! Escaneie para conectar.', type: 'info' });
+                    
                 } catch (error) {
                     console.error('Erro ao gerar QR Code:', error);
+                    this.io.emit('error', { message: 'Erro ao gerar QR Code: ' + error.message });
                 }
             }
 
@@ -335,10 +311,14 @@ class YouTubeWhatsAppBotServer {
                 this.qrCode = null;
                 
                 const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                const reason = lastDisconnect?.error?.output?.payload?.message || 'Desconhecido';
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const reason = this.getDisconnectReason(statusCode);
                 
-                console.log('Conexão fechada devido a:', reason, 'Reconectando...', shouldReconnect);
-                this.io.emit('disconnected', { reason: reason });
+                console.log('Conexão fechada:', reason, 'Reconectando:', shouldReconnect);
+                
+                // CORRIGIDO: Emitir evento correto
+                this.io.emit('disconnected');
+                this.emitStatus();
                 this.io.emit('log', { message: `Desconectado: ${reason}`, type: 'warning' });
                 
                 if (shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -349,30 +329,39 @@ class YouTubeWhatsAppBotServer {
                 } else {
                     this.io.emit('log', { message: 'Usuário foi deslogado. Necessário novo QR Code.', type: 'warning' });
                 }
+                
             } else if (connection === 'open') {
                 this.isConnected = true;
                 this.isConnecting = false;
                 this.qrCode = null;
                 this.reconnectAttempts = 0;
                 
-                console.log('WhatsApp conectado com sucesso!');
-                this.io.emit('connected', { isConnected: this.isConnected });
+                console.log('✅ WhatsApp conectado com sucesso!');
+                
+                // CORRIGIDO: Emitir evento correto
+                this.io.emit('connected');
+                this.emitStatus();
                 this.io.emit('log', { message: 'WhatsApp conectado com sucesso!', type: 'success' });
                 
-                // Aguardar um pouco antes de carregar grupos
+                // Carregar grupos após conexão
                 setTimeout(() => {
                     this.loadGroups();
                     if (!this.autoScheduleEnabled) {
                         this.setupAutoSchedule();
                     }
                 }, 3000);
+                
             } else if (connection === 'connecting') {
                 this.io.emit('log', { message: 'Conectando ao WhatsApp...', type: 'info' });
             }
+            
+            // Sempre emitir status atualizado
+            this.emitStatus();
         });
 
         this.sock.ev.on('creds.update', saveCreds);
 
+        // ADICIONADO: Melhor handling de mensagens
         this.sock.ev.on('messages.upsert', async (m) => {
             const message = m.messages[0];
             if (!message.message || message.key.fromMe) return;
@@ -396,7 +385,7 @@ class YouTubeWhatsAppBotServer {
             }
         });
 
-        // Event para grupos atualizados
+        // ADICIONADO: Melhor handling de grupos
         this.sock.ev.on('groups.update', async (updates) => {
             for (const update of updates) {
                 if (this.groups.has(update.id)) {
@@ -404,15 +393,30 @@ class YouTubeWhatsAppBotServer {
                     if (update.subject) {
                         groupData.name = update.subject;
                         this.saveData();
+                        this.emitGroups();
                     }
                 }
             }
         });
     }
 
+    // NOVO: Função para obter razão da desconexão
+    getDisconnectReason(statusCode) {
+        const reasons = {
+            [DisconnectReason.badSession]: 'Sessão inválida',
+            [DisconnectReason.connectionClosed]: 'Conexão fechada',
+            [DisconnectReason.connectionLost]: 'Conexão perdida',
+            [DisconnectReason.connectionReplaced]: 'Conexão substituída',
+            [DisconnectReason.loggedOut]: 'Usuário deslogado',
+            [DisconnectReason.restartRequired]: 'Reinicialização necessária',
+            [DisconnectReason.timedOut]: 'Tempo esgotado'
+        };
+        return reasons[statusCode] || 'Motivo desconhecido';
+    }
+
     scheduleReconnect() {
         this.reconnectAttempts++;
-        const delay = this.reconnectDelay * this.reconnectAttempts; // Delay crescente
+        const delay = this.reconnectDelay * this.reconnectAttempts;
         
         this.io.emit('log', { 
             message: `Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts} em ${delay/1000}s...`, 
@@ -447,7 +451,8 @@ class YouTubeWhatsAppBotServer {
         this.qrCode = null;
         this.connectionState = 'close';
         
-        this.io.emit('disconnected', { reason: 'Manual disconnect' });
+        this.io.emit('disconnected');
+        this.emitStatus();
         this.io.emit('log', { message: 'Desconectado do WhatsApp', type: 'info' });
     }
 
@@ -461,76 +466,42 @@ class YouTubeWhatsAppBotServer {
             this.io.emit('log', { message: 'Carregando grupos...', type: 'info' });
             
             const groups = await this.sock.groupFetchAllParticipating();
-            this.groups.clear();
+            let newGroupsCount = 0;
             
             for (const [id, group] of Object.entries(groups)) {
-                this.groups.set(id, {
-                    name: group.subject,
-                    active: false,
-                    participants: group.participants?.length || 0
-                });
+                if (!this.groups.has(id)) {
+                    newGroupsCount++;
+                    this.groups.set(id, {
+                        name: group.subject,
+                        active: false,
+                        participants: group.participants?.length || 0
+                    });
+                } else {
+                    // Atualizar dados existentes
+                    const existingGroup = this.groups.get(id);
+                    existingGroup.name = group.subject;
+                    existingGroup.participants = group.participants?.length || 0;
+                }
             }
             
-            this.io.emit('groups_loaded', {
-                groups: Array.from(this.groups.entries()).map(([id, data]) => ({
-                    id,
-                    name: data.name,
-                    active: data.active,
-                    participants: data.participants
-                }))
+            this.saveData();
+            this.emitGroups();
+            
+            this.io.emit('log', { 
+                message: `${this.groups.size} grupos carregados (${newGroupsCount} novos)`, 
+                type: 'success' 
             });
             
-            this.io.emit('log', { message: `${this.groups.size} grupos carregados com sucesso!`, type: 'success' });
         } catch (error) {
             console.error('Erro ao carregar grupos:', error);
             this.io.emit('error', { message: 'Erro ao carregar grupos: ' + error.message });
         }
     }
 
-    activateGroup(groupName) {
-        const group = Array.from(this.groups.entries()).find(([id, data]) => 
-            data.name.toLowerCase().includes(groupName.toLowerCase())
-        );
-        
-        if (group) {
-            if (group[1].active) {
-                this.io.emit('log', { message: `Grupo "${group[1].name}" já está ativo!`, type: 'warning' });
-            } else {
-                group[1].active = true;
-                this.saveData();
-                this.io.emit('log', { message: `Grupo "${group[1].name}" foi ATIVADO!`, type: 'success' });
-                this.io.emit('group_updated', { groupId: group[0], active: true });
-            }
-        } else {
-            this.io.emit('log', { message: 'Grupo não encontrado!', type: 'error' });
-        }
-    }
-
-    deactivateGroup(groupName) {
-        const group = Array.from(this.groups.entries()).find(([id, data]) => 
-            data.name.toLowerCase().includes(groupName.toLowerCase())
-        );
-        
-        if (group) {
-            if (!group[1].active) {
-                this.io.emit('log', { message: `Grupo "${group[1].name}" já está inativo!`, type: 'warning' });
-            } else {
-                group[1].active = false;
-                this.saveData();
-                this.io.emit('log', { message: `Grupo "${group[1].name}" foi DESATIVADO!`, type: 'info' });
-                this.io.emit('group_updated', { groupId: group[0], active: false });
-            }
-        } else {
-            this.io.emit('log', { message: 'Grupo não encontrado!', type: 'error' });
-        }
-    }
-
     async getLatestVideo() {
         try {
             const url = `https://www.googleapis.com/youtube/v3/search?key=${this.youtubeApiKey}&channelId=${this.channelId}&order=date&part=snippet&type=video&maxResults=1`;
-            const response = await axios.get(url, {
-                timeout: 10000 // 10 segundos timeout
-            });
+            const response = await axios.get(url, { timeout: 15000 });
             
             if (response.data.items && response.data.items.length > 0) {
                 const video = response.data.items[0];
@@ -618,14 +589,25 @@ class YouTubeWhatsAppBotServer {
                 } else {
                     this.io.emit('log', { message: `❌ Falha no envio para ${groupData.name}`, type: 'error' });
                 }
-                await this.delay(3000); // 3 segundos entre envios
+                await this.delay(3000);
             }
             
             this.io.emit('log', { message: `🎉 SUCESSO! Vídeo enviado para ${sentCount}/${activeGroups.length} grupos!`, type: 'success' });
-            this.io.emit('video_sent', { videoData, sentCount, totalGroups: activeGroups.length });
+            
+            // CORRIGIDO: Emitir evento correto
+            this.io.emit('video_sent', { 
+                title: videoData.title,
+                groups: sentCount
+            });
         } else {
             this.io.emit('log', { message: 'Nenhum vídeo novo encontrado (já foi enviado)', type: 'info' });
         }
+        
+        // CORRIGIDO: Emitir evento correto
+        this.io.emit('video_checked', { 
+            newVideo: videoData.isNew || forceCheck,
+            title: videoData.title
+        });
     }
 
     setupAutoSchedule() {
@@ -661,9 +643,9 @@ class YouTubeWhatsAppBotServer {
 
             this.autoScheduleEnabled = true;
             this.saveData();
+            this.emitStatus();
 
             this.io.emit('log', { message: '⏰ Agendamento automático ATIVADO! (08h, 12h, 18h)', type: 'success' });
-            this.io.emit('auto_schedule_changed', { enabled: true });
         } catch (error) {
             console.error('Erro ao configurar agendamentos:', error);
             this.io.emit('error', { message: 'Erro ao configurar agendamentos: ' + error.message });
@@ -683,9 +665,9 @@ class YouTubeWhatsAppBotServer {
 
         this.autoScheduleEnabled = false;
         this.saveData();
+        this.emitStatus();
 
         this.io.emit('log', { message: '⏰ Agendamento automático DESATIVADO!', type: 'warning' });
-        this.io.emit('auto_schedule_changed', { enabled: false });
     }
 
     createCustomSchedule(cronExpr) {
@@ -710,15 +692,9 @@ class YouTubeWhatsAppBotServer {
 
             task.start();
             this.saveData();
+            this.emitSchedules();
 
             this.io.emit('log', { message: `📅 Agendamento personalizado criado: ${cronExpr}`, type: 'success' });
-            this.io.emit('schedule_created', { 
-                id: scheduleId, 
-                cron: cronExpr, 
-                type: 'custom',
-                description: `Agendamento personalizado: ${cronExpr}`,
-                created: new Date().toISOString()
-            });
         } catch (error) {
             this.io.emit('error', { message: 'Expressão de horário inválida!' });
         }
@@ -735,8 +711,8 @@ class YouTubeWhatsAppBotServer {
             schedule.task.stop();
             this.schedules.delete(scheduleId);
             this.saveData();
+            this.emitSchedules();
             this.io.emit('log', { message: `🗑️ Agendamento removido com sucesso!`, type: 'success' });
-            this.io.emit('schedule_removed', { id: scheduleId });
         } else {
             this.io.emit('log', { message: 'Agendamento não encontrado!', type: 'error' });
         }
@@ -749,23 +725,34 @@ class YouTubeWhatsAppBotServer {
         
         if (videoData) {
             this.io.emit('log', { message: `✅ Vídeo encontrado: ${videoData.title}`, type: 'success' });
+            // CORRIGIDO: Emitir evento correto
             this.io.emit('video_test', { 
-                videoData: videoData,
-                isNew: videoData.isNew
+                success: true,
+                videos: 1,
+                videoData: videoData
             });
         } else {
             this.io.emit('log', { message: '❌ ERRO! Não foi possível buscar vídeos.', type: 'error' });
+            this.io.emit('video_test', { 
+                success: false,
+                error: 'Não foi possível buscar vídeos'
+            });
         }
     }
 
     cleanSession() {
         this.disconnectWhatsApp();
         
-        if (fs.existsSync(this.authDir)) {
-            fs.rmSync(this.authDir, { recursive: true, force: true });
-            this.io.emit('log', { message: '🗑️ Sessão removida com sucesso!', type: 'success' });
-        } else {
-            this.io.emit('log', { message: 'Nenhuma sessão encontrada para limpar.', type: 'info' });
+        try {
+            if (fs.existsSync(this.authDir)) {
+                fs.rmSync(this.authDir, { recursive: true, force: true });
+                this.io.emit('log', { message: '🗑️ Sessão removida com sucesso!', type: 'success' });
+                this.io.emit('session_cleaned');
+            } else {
+                this.io.emit('log', { message: 'Nenhuma sessão encontrada para limpar.', type: 'info' });
+            }
+        } catch (error) {
+            this.io.emit('log', { message: 'Erro ao limpar sessão: ' + error.message, type: 'error' });
         }
     }
 
@@ -810,13 +797,13 @@ class YouTubeWhatsAppBotServer {
         }
     }
 
-    // Sistema de Keep-Alive para manter a conexão estável
+    // Sistema de Keep-Alive melhorado
     startKeepAlive() {
         // Verificar status da conexão a cada 30 segundos
         setInterval(() => {
             if (this.isConnected && this.sock) {
                 try {
-                    // Ping simples para manter conexão ativa
+                    // Ping para manter conexão ativa
                     this.sock.sendPresenceUpdate('available');
                 } catch (error) {
                     console.error('Erro no keep-alive:', error);
@@ -834,9 +821,13 @@ class YouTubeWhatsAppBotServer {
                 this.connectWhatsApp();
             }
         }, 120000);
+
+        // Emitir status periodicamente para clientes conectados
+        setInterval(() => {
+            this.emitStatus();
+        }, 60000); // A cada minuto
     }
 
-    // Sistema de monitoramento de saúde da conexão
     async checkConnectionHealth() {
         if (!this.sock || !this.isConnected) {
             return false;
@@ -855,7 +846,6 @@ class YouTubeWhatsAppBotServer {
         }
     }
 
-    // Método para forçar reconexão
     async forceReconnect() {
         this.io.emit('log', { message: '🔄 Forçando reconexão...', type: 'warning' });
         
@@ -868,7 +858,6 @@ class YouTubeWhatsAppBotServer {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // Função para obter estatísticas do bot
     getStats() {
         return {
             connectionState: this.connectionState,
@@ -886,8 +875,14 @@ class YouTubeWhatsAppBotServer {
     }
 
     start(port = 3000) {
+        // Middleware para logs de requisições
+        this.app.use((req, res, next) => {
+            console.log(`${new Date().toLocaleTimeString()} - ${req.method} ${req.url}`);
+            next();
+        });
+
         // Iniciar o servidor
-        this.server.listen(port, () => {
+        this.server.listen(port, '0.0.0.0', () => {
             console.log('🚀 ================================');
             console.log(`🚀 Servidor rodando na porta ${port}`);
             console.log(`🌐 Acesse: http://localhost:${port}`);
@@ -895,34 +890,63 @@ class YouTubeWhatsAppBotServer {
             console.log('🚀 ================================');
         });
 
-        // Conectar automaticamente ao iniciar
+        // Conectar automaticamente ao iniciar (opcional)
         setTimeout(() => {
-            this.connectWhatsApp();
-        }, 2000);
+            console.log('🔄 Iniciando conexão automática...');
+            // Descomente a linha abaixo se quiser conectar automaticamente
+            // this.connectWhatsApp();
+        }, 3000);
 
         // Handlers para encerramento graceful
-        process.on('SIGINT', () => {
-            console.log('\n🛑 Encerrando bot...');
+        const gracefulShutdown = () => {
+            console.log('\n🛑 Encerrando bot graciosamente...');
+            
+            // Parar todos os agendamentos
+            this.schedules.forEach(schedule => {
+                if (schedule.task) {
+                    schedule.task.stop();
+                }
+            });
+            
+            // Desconectar WhatsApp
             this.disconnectWhatsApp();
-            process.exit(0);
-        });
+            
+            // Fechar servidor
+            this.server.close(() => {
+                console.log('✅ Servidor encerrado');
+                process.exit(0);
+            });
+        };
 
-        process.on('SIGTERM', () => {
-            console.log('\n🛑 Encerrando bot...');
-            this.disconnectWhatsApp();
-            process.exit(0);
-        });
+        process.on('SIGINT', gracefulShutdown);
+        process.on('SIGTERM', gracefulShutdown);
 
         // Handler para erros não capturados
         process.on('uncaughtException', (error) => {
             console.error('❌ Erro não capturado:', error);
             this.io.emit('error', { message: 'Erro crítico: ' + error.message });
+            
+            // Não encerrar o processo, apenas logar
         });
 
         process.on('unhandledRejection', (reason, promise) => {
             console.error('❌ Promise rejeitada:', reason);
             this.io.emit('error', { message: 'Promise rejeitada: ' + reason });
         });
+
+        // Monitoramento de memória
+        setInterval(() => {
+            const memUsage = process.memoryUsage();
+            const memMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+            
+            if (memMB > 200) { // Mais de 200MB
+                console.warn(`⚠️ Alto uso de memória: ${memMB}MB`);
+                this.io.emit('log', { 
+                    message: `Alto uso de memória detectado: ${memMB}MB`, 
+                    type: 'warning' 
+                });
+            }
+        }, 300000); // Verificar a cada 5 minutos
     }
 }
 
