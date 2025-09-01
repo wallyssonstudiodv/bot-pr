@@ -852,4 +852,252 @@
 
         function addScheduleToList(schedule) {
             const scheduleElement = document.createElement('div');
-            scheduleElement.className =
+            scheduleElement.className = 'schedule-item';
+            scheduleElement.setAttribute('data-schedule-id', schedule.id);
+            scheduleElement.innerHTML = `
+                <div>
+                    <strong>${schedule.cron}</strong>
+                    <small style="display: block; color: #666;">${formatCronDescription(schedule.cron)}</small>
+                </div>
+                <button class="btn btn-danger" onclick="removeSchedule('${schedule.id}')">
+                    <i class="fas fa-trash"></i> Remover
+                </button>
+            `;
+            elements.schedulesList.appendChild(scheduleElement);
+        }
+
+        function removeScheduleFromList(scheduleId) {
+            const scheduleElement = elements.schedulesList.querySelector(`[data-schedule-id="${scheduleId}"]`);
+            if (scheduleElement) {
+                scheduleElement.remove();
+            }
+        }
+
+        function removeSchedule(scheduleId) {
+            if (confirm('Tem certeza que deseja remover este agendamento?')) {
+                socket.emit('remove_schedule', { id: scheduleId });
+            }
+        }
+
+        function formatCronDescription(cron) {
+            // Função simples para converter cron em descrição legível
+            const parts = cron.split(' ');
+            if (parts.length !== 5) return cron;
+            
+            const [minute, hour, day, month, weekday] = parts;
+            
+            if (minute === '0' && hour !== '*' && day === '*' && month === '*' && weekday === '*') {
+                return `Todos os dias às ${hour}:00`;
+            }
+            
+            if (minute !== '*' && hour !== '*' && day === '*' && month === '*' && weekday === '*') {
+                return `Todos os dias às ${hour}:${minute.padStart(2, '0')}`;
+            }
+            
+            return 'Agendamento personalizado';
+        }
+
+        function isValidCron(cron) {
+            // Validação básica de formato cron
+            const parts = cron.split(' ');
+            if (parts.length !== 5) return false;
+            
+            const [minute, hour, day, month, weekday] = parts;
+            
+            // Validações básicas
+            if (minute !== '*' && (isNaN(minute) || minute < 0 || minute > 59)) return false;
+            if (hour !== '*' && (isNaN(hour) || hour < 0 || hour > 23)) return false;
+            if (day !== '*' && (isNaN(day) || day < 1 || day > 31)) return false;
+            if (month !== '*' && (isNaN(month) || month < 1 || month > 12)) return false;
+            if (weekday !== '*' && (isNaN(weekday) || weekday < 0 || weekday > 6)) return false;
+            
+            return true;
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${getIconForType(type)}"></i>
+                ${message}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Mostrar notificação
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            // Remover notificação após 4 segundos
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 4000);
+        }
+
+        function getIconForType(type) {
+            const icons = {
+                'success': 'check-circle',
+                'error': 'exclamation-circle',
+                'warning': 'exclamation-triangle',
+                'info': 'info-circle'
+            };
+            return icons[type] || 'info-circle';
+        }
+
+        // Auto-refresh status periodicamente
+        setInterval(() => {
+            if (socket.connected) {
+                socket.emit('get_status');
+            }
+        }, 30000); // A cada 30 segundos
+
+        // Inicialização
+        window.addEventListener('load', () => {
+            addLog('Painel de controle iniciado', 'info');
+            
+            // Solicitar status inicial
+            if (socket.connected) {
+                socket.emit('get_status');
+                socket.emit('get_groups');
+                socket.emit('get_schedules');
+            }
+        });
+
+        // Tratamento de erros globais
+        window.addEventListener('error', (event) => {
+            addLog(`Erro no cliente: ${event.message}`, 'error');
+        });
+
+        // Detectar quando o usuário sai da página
+        window.addEventListener('beforeunload', (event) => {
+            if (socket.connected) {
+                socket.disconnect();
+            }
+        });
+
+        // Adicionar event listeners para teclas de atalho
+        document.addEventListener('keydown', (event) => {
+            // Ctrl + R para reiniciar
+            if (event.ctrlKey && event.key === 'r') {
+                event.preventDefault();
+                elements.restartBtn.click();
+            }
+            
+            // Ctrl + T para testar vídeo
+            if (event.ctrlKey && event.key === 't') {
+                event.preventDefault();
+                elements.testVideoBtn.click();
+            }
+            
+            // Ctrl + Enter para verificar vídeos
+            if (event.ctrlKey && event.key === 'Enter') {
+                event.preventDefault();
+                elements.checkVideosBtn.click();
+            }
+        });
+
+        // Função para limpar logs
+        function clearLogs() {
+            elements.logs.innerHTML = '';
+            addLog('Logs limpos', 'info');
+        }
+
+        // Adicionar botão para limpar logs
+        const clearLogsBtn = document.createElement('button');
+        clearLogsBtn.className = 'btn btn-secondary';
+        clearLogsBtn.style.position = 'absolute';
+        clearLogsBtn.style.top = '10px';
+        clearLogsBtn.style.right = '10px';
+        clearLogsBtn.innerHTML = '<i class="fas fa-eraser"></i> Limpar';
+        clearLogsBtn.onclick = clearLogs;
+        
+        const logsContainer = document.querySelector('.logs-container');
+        logsContainer.style.position = 'relative';
+        logsContainer.appendChild(clearLogsBtn);
+
+        // Scroll automático nos logs
+        const logsElement = elements.logs;
+        const observer = new MutationObserver(() => {
+            logsElement.scrollTop = 0; // Scroll para o topo (logs mais recentes)
+        });
+        observer.observe(logsElement, { childList: true });
+
+        // Adicionar indicador de status na aba do navegador
+        function updateFavicon(status) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            
+            // Cor baseada no status
+            const colors = {
+                'connected': '#4CAF50',
+                'connecting': '#FF9800',
+                'disconnected': '#f44336'
+            };
+            
+            ctx.fillStyle = colors[status] || '#f44336';
+            ctx.fillRect(0, 0, 32, 32);
+            
+            // Adicionar ícone
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(status === 'connected' ? '✓' : status === 'connecting' ? '...' : '✗', 16, 22);
+            
+            // Atualizar favicon
+            const favicon = document.querySelector('link[rel="icon"]') || document.createElement('link');
+            favicon.rel = 'icon';
+            favicon.href = canvas.toDataURL();
+            if (!document.querySelector('link[rel="icon"]')) {
+                document.head.appendChild(favicon);
+            }
+        }
+
+        // Atualizar favicon quando status mudar
+        const originalUpdateConnectionStatus = updateConnectionStatus;
+        updateConnectionStatus = function(status) {
+            originalUpdateConnectionStatus(status);
+            updateFavicon(status);
+            
+            // Atualizar título da página
+            document.title = `YouTube Bot - ${status === 'connected' ? 'Conectado' : status === 'connecting' ? 'Conectando...' : 'Desconectado'}`;
+        };
+
+        // Sistema de heartbeat para verificar conexão
+        let heartbeatInterval;
+        
+        function startHeartbeat() {
+            heartbeatInterval = setInterval(() => {
+                if (socket.connected) {
+                    socket.emit('heartbeat');
+                }
+            }, 10000); // A cada 10 segundos
+        }
+
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+            }
+        }
+
+        socket.on('connect', () => {
+            startHeartbeat();
+        });
+
+        socket.on('disconnect', () => {
+            stopHeartbeat();
+        });
+
+        socket.on('heartbeat', () => {
+            // Resposta do heartbeat - conexão OK
+        });
+    </script>
+</body>
+</html>
