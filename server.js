@@ -121,6 +121,66 @@ class YouTubeWhatsAppBotServer {
             socket.on('restart_connection', () => {
                 this.restartConnection();
             });
+
+            // EVENTOS ADICIONADOS PARA CORRIGIR O QR CODE
+            socket.on('get_status', () => {
+                socket.emit('status', {
+                    isConnected: this.isConnected,
+                    isConnecting: this.isConnecting,
+                    connectionState: this.connectionState,
+                    autoScheduleEnabled: this.autoScheduleEnabled,
+                    qrCode: this.qrCode,
+                    totalGroups: this.groups.size,
+                    activeGroups: Array.from(this.groups.values()).filter(g => g.active).length,
+                    lastVideoId: this.lastVideoId,
+                    reconnectAttempts: this.reconnectAttempts
+                });
+            });
+
+            socket.on('get_groups', () => {
+                if (this.groups.size > 0) {
+                    socket.emit('groups_loaded', {
+                        groups: Array.from(this.groups.entries()).map(([id, data]) => ({
+                            id,
+                            name: data.name,
+                            active: data.active,
+                            participants: data.participants
+                        }))
+                    });
+                }
+            });
+
+            socket.on('get_schedules', () => {
+                const schedulesArray = Array.from(this.schedules.entries()).map(([id, data]) => ({
+                    id,
+                    cron: data.cron,
+                    type: data.type,
+                    description: data.description,
+                    created: data.created
+                }));
+                socket.emit('schedules_loaded', schedulesArray);
+            });
+
+            socket.on('toggle_group', (data) => {
+                const group = this.groups.get(data.groupId);
+                if (group) {
+                    group.active = data.active;
+                    this.saveData();
+                    this.io.emit('group_updated', { groupId: data.groupId, active: data.active });
+                    this.io.emit('log', { 
+                        message: `Grupo "${group.name}" foi ${data.active ? 'ATIVADO' : 'DESATIVADO'}!`, 
+                        type: data.active ? 'success' : 'info' 
+                    });
+                }
+            });
+
+            socket.on('heartbeat', () => {
+                socket.emit('heartbeat');
+            });
+
+            socket.on('remove_schedule', (data) => {
+                this.removeSchedule(data.id);
+            });
         });
     }
 
