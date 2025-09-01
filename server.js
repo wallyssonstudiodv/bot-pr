@@ -274,7 +274,7 @@ class YouTubeWhatsAppBotServer {
                 this.isConnecting = false;
                 this.qrCode = null;
                 
-                const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
                 const reason = lastDisconnect?.error?.output?.payload?.message || 'Desconhecido';
                 
                 console.log('Conexão fechada devido a:', reason, 'Reconectando...', shouldReconnect);
