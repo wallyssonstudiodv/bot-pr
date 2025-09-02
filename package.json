@@ -1,21 +1,25 @@
 {
-  "name": "whatsapp-bot-youtube",
+  "name": "youtube-whatsapp-bot",
   "version": "1.0.0",
-  "description": "Bot de WhatsApp que envia o último vídeo do canal do YouTube para grupos, com painel web.",
-  "type": "module",
+  "description": "Bot para envio automático de vídeos do YouTube no WhatsApp",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "author": "Wallysson S. de Oliveira",
-  "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.6.0",
-    "axios": "^1.6.5",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4",
+    "node-cron": "^3.0.3",
+    "qrcode": "^1.5.3",
+    "fs-extra": "^11.2.0",
+    "axios": "^1.6.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
-  }
+  },
+  "keywords": ["whatsapp", "bot", "youtube", "automation"],
+  "author": "Wallysson Studio Dv",
+  "license": "MIT"
 }
