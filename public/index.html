@@ -5,14 +5,17 @@
 <title>WhatsApp Bot - Painel</title>
 <style>
 body { font-family: Arial; background:#111; color:#0f0; text-align:center; }
-img { max-width: 200px; margin: 10px; }
-table { margin:auto; border-collapse: collapse; width: 90%; }
+img { max-width: 200px; margin: 10px; border:2px solid #0f0; }
+table { margin:auto; border-collapse: collapse; width: 90%; margin-bottom:20px; }
 td, th { border:1px solid #0f0; padding:5px; }
-button { padding:5px 10px; cursor:pointer; }
+button { padding:5px 10px; cursor:pointer; background:#0f0; color:#000; border:none; }
+input, select { padding:5px; margin:5px; background:#111; color:#0f0; border:1px solid #0f0; }
+h1,h2 { margin-top:20px; }
 </style>
 </head>
 <body>
 <h1>WhatsApp Bot</h1>
+
 <h2>QR Code</h2>
 <img id="qr" src="" alt="QR Code"/>
 
@@ -22,18 +25,33 @@ button { padding:5px 10px; cursor:pointer; }
 <h2>Agendar Envio</h2>
 <label>Data: <input type="date" id="date"></label>
 <label>Hora: <input type="time" id="time"></label>
-<label>Canal: <select id="channel"></select></label>
+<label>Canal: 
+<select id="channel"></select>
+</label>
 <button onclick="scheduleSend()">Agendar</button>
 
 <h2>Agendamentos</h2>
-<table id="scheduled"><thead><tr><th>#</th><th>Data</th><th>Hora</th><th>Canal</th><th>Ação</th></tr></thead><tbody></tbody></table>
+<table id="scheduled">
+<thead>
+<tr><th>#</th><th>Data</th><th>Hora</th><th>Canal</th><th>Ação</th></tr>
+</thead>
+<tbody></tbody>
+</table>
 
-<h2>Histórico</h2>
-<table id="history"><thead><tr><th>Data</th><th>Grupos</th><th>Vídeo</th></tr></thead><tbody></tbody></table>
+<h2>Histórico de Envios</h2>
+<table id="history">
+<thead>
+<tr><th>Data</th><th>Grupos</th><th>Vídeo</th></tr>
+</thead>
+<tbody></tbody>
+</table>
 
 <script>
 async function loadQRCode() {
-    try { document.getElementById('qr').src = await fetch('qr.txt').then(r=>r.text()); } catch{}
+    try {
+        const qr = await fetch('qr.txt').then(r=>r.text());
+        document.getElementById('qr').src = qr;
+    } catch(e){ console.log('QR não disponível'); }
 }
 
 async function loadGroups() {
@@ -41,9 +59,12 @@ async function loadGroups() {
     const container = document.getElementById('groups');
     container.innerHTML = '';
     groups.forEach(g=>{
-        const cb = document.createElement('input'); cb.type='checkbox'; cb.value=g.id; cb.id=g.id;
-        const label = document.createElement('label'); label.htmlFor=g.id; label.textContent=g.name;
-        container.appendChild(cb); container.appendChild(label); container.appendChild(document.createElement('br'));
+        const cb = document.createElement('input');
+        cb.type='checkbox'; cb.value=g.id; cb.id=g.id;
+        const label = document.createElement('label');
+        label.htmlFor=g.id; label.textContent=g.name;
+        container.appendChild(cb); container.appendChild(label);
+        container.appendChild(document.createElement('br'));
     });
 }
 
@@ -63,7 +84,9 @@ async function loadHistory() {
     const tbody = document.querySelector('#history tbody'); tbody.innerHTML='';
     data.forEach(d=>{
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${d.date}</td><td>${d.groups.join(', ')}</td><td><a href="${d.video.link}" target="_blank">${d.video.title}</a></td>`;
+        tr.innerHTML = `<td>${new Date(d.date).toLocaleString()}</td>
+        <td>${d.groups.join(', ')}</td>
+        <td><a href="${d.video.link}" target="_blank">${d.video.title}</a></td>`;
         tbody.appendChild(tr);
     });
 }
@@ -74,7 +97,11 @@ async function loadChannels() {
         {id:"OUTRO_ID", name:"Canal 2"}
     ];
     const sel = document.getElementById('channel');
-    channels.forEach(c=>{ const opt=document.createElement('option'); opt.value=c.id; opt.text=c.name; sel.appendChild(opt); });
+    sel.innerHTML = '';
+    channels.forEach(c=>{
+        const opt=document.createElement('option');
+        opt.value=c.id; opt.text=c.name; sel.appendChild(opt);
+    });
 }
 
 async function scheduleSend() {
@@ -82,14 +109,22 @@ async function scheduleSend() {
     const date = document.getElementById('date').value;
     const time = document.getElementById('time').value;
     const channelId = document.getElementById('channel').value;
-    if(!selected.length||!date||!time) return alert('Preencha tudo!');
-    const res = await fetch('/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({groupIds:selected,date,time,channelId})}).then(r=>r.json());
+    if(!selected.length||!date||!time) return alert('Preencha todos os campos e selecione pelo menos um grupo!');
+    const res = await fetch('/schedule',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({groupIds:selected,date,time,channelId})
+    }).then(r=>r.json());
     alert(res.message);
     loadScheduled();
 }
 
 async function deleteSchedule(index) {
-    await fetch('/scheduled/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index})});
+    await fetch('/scheduled/delete',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({index})
+    });
     loadScheduled();
 }
 
