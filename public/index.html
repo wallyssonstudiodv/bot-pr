@@ -1,111 +1,75 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>WhatsApp Bot - Painel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel WhatsApp Bot</title>
 <style>
-body { font-family: Arial; background:#111; color:#0f0; text-align:center; }
-img { max-width: 200px; margin: 10px; border:2px solid #0f0; }
-table { margin:auto; border-collapse: collapse; width: 90%; margin-bottom:20px; }
-td, th { border:1px solid #0f0; padding:5px; }
-button { padding:5px 10px; cursor:pointer; background:#0f0; color:#000; border:none; }
-input, select { padding:5px; margin:5px; background:#111; color:#0f0; border:1px solid #0f0; }
-h1,h2 { margin-top:20px; }
+  body { font-family:sans-serif; background:linear-gradient(135deg,#002266,#660000); color:#fff; display:flex; justify-content:center; padding:10px; }
+  .container { max-width:450px; width:100%; background:rgba(0,0,0,0.6); border-radius:15px; padding:20px; backdrop-filter:blur(10px);}
+  h1,h2{margin:10px 0;}
+  img#qr{width:100%; max-width:250px; display:block; margin:10px auto; border-radius:15px;}
+  #groups{max-height:200px; overflow-y:auto; margin:10px 0; padding:10px; background:rgba(0,0,0,0.3); border-radius:10px;}
+  #groups label{display:flex; justify-content:space-between; align-items:center; padding:5px; margin-bottom:5px; background:rgba(255,255,255,0.05); border-radius:5px; cursor:pointer;}
+  #groups label:hover{background:rgba(255,255,255,0.15);}
+  input[type="checkbox"]{transform:scale(1.2);}
+  button,select,input[type="time"]{width:100%; padding:10px; margin:5px 0; border:none; border-radius:10px; cursor:pointer;}
+  button{background:linear-gradient(90deg,#2196f3,#f44336); color:#fff; font-weight:bold;}
+  button:hover{opacity:0.85;}
+  .scheduler{display:flex; flex-direction:column; gap:5px; margin-top:10px; padding:10px; border-radius:10px; background:rgba(255,255,255,0.05);}
+  @media(min-width:600px){.scheduler{flex-direction:row; justify-content:space-between;} .scheduler select,.scheduler input{width:48%;}}
 </style>
 </head>
 <body>
+<div class="container">
 <h1>WhatsApp Bot</h1>
-
 <h2>QR Code</h2>
-<img id="qr" src="" alt="QR Code"/>
-
-<h2>Grupos Ativos</h2>
+<img id="qr" src="" alt="QR Code">
+<h2>Grupos</h2>
 <div id="groups"></div>
-
-<h2>Agendar Envio</h2>
-<label>Data: <input type="date" id="date"></label>
-<label>Hora: <input type="time" id="time"></label>
-<button onclick="scheduleSend()">Agendar</button>
-
-<h2>Agendamentos</h2>
-<table id="scheduled">
-<thead>
-<tr><th>#</th><th>Data</th><th>Hora</th><th>Ação</th></tr>
-</thead>
-<tbody></tbody>
-</table>
-
-<h2>Histórico de Envios</h2>
-<table id="history">
-<thead>
-<tr><th>Data</th><th>Grupos</th><th>Vídeo</th></tr>
-</thead>
-<tbody></tbody>
-</table>
+<button onclick="sendVideo()">Enviar último vídeo</button>
+<div class="scheduler">
+  <select id="day">
+    <option value="0">Domingo</option>
+    <option value="1">Segunda</option>
+    <option value="2">Terça</option>
+    <option value="3">Quarta</option>
+    <option value="4">Quinta</option>
+    <option value="5">Sexta</option>
+    <option value="6">Sábado</option>
+  </select>
+  <input type="time" id="time" value="12:00">
+  <button onclick="scheduleVideo()">Agendar Envio</button>
+</div>
+</div>
 
 <script>
-async function loadQRCode() {
-    try {
-        const qr = await fetch('qr.txt').then(r=>r.text());
-        document.getElementById('qr').src = qr;
-    } catch(e){ console.log('QR não disponível'); }
+async function loadQR(){
+    const res = await fetch('qr.txt'); 
+    document.getElementById('qr').src = await res.text();
 }
-
-async function loadGroups() {
-    const groups = await fetch('/groups').then(r=>r.json());
-    const container = document.getElementById('groups'); container.innerHTML='';
-    groups.forEach(g=>{
-        const cb = document.createElement('input'); cb.type='checkbox'; cb.value=g.id; cb.id=g.id;
-        const label = document.createElement('label'); label.htmlFor=g.id; label.textContent=g.name;
-        container.appendChild(cb); container.appendChild(label);
-        container.appendChild(document.createElement('br'));
-    });
+async function loadGroups(){
+    const res = await fetch('/groups'); 
+    const groups = await res.json();
+    document.getElementById('groups').innerHTML = groups.map(g=>`
+      <label><span>${g.subject||g.name}</span><input type="checkbox" value="${g.id}"></label>
+    `).join('');
 }
-
-async function loadScheduled() {
-    const data = await fetch('/scheduled').then(r=>r.json());
-    const tbody = document.querySelector('#scheduled tbody'); tbody.innerHTML='';
-    data.forEach((d,i)=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${i+1}</td><td>${d.date}</td><td>${d.time}</td>
-        <td><button onclick="deleteSchedule(${i})">Deletar</button></td>`;
-        tbody.appendChild(tr);
-    });
+async function sendVideo(){
+    const checked = [...document.querySelectorAll('#groups input:checked')].map(i=>i.value);
+    if(!checked.length) return alert('Selecione algum grupo!');
+    await fetch('/send-video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({groupIds:checked})});
+    alert('Vídeo enviado!');
 }
-
-async function loadHistory() {
-    const data = await fetch('/history').then(r=>r.json());
-    const tbody = document.querySelector('#history tbody'); tbody.innerHTML='';
-    data.forEach(d=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${new Date(d.date).toLocaleString()}</td>
-        <td>${d.groups.join(', ')}</td>
-        <td><a href="${d.video.link}" target="_blank">${d.video.title}</a></td>`;
-        tbody.appendChild(tr);
-    });
+async function scheduleVideo(){
+    const day = document.getElementById('day').value;
+    const time = document.getElementById('time').value.split(':');
+    const hour=parseInt(time[0]), minute=parseInt(time[1]);
+    await fetch('/schedule-video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({day:parseInt(day),hour,minute})});
+    alert(`Envio agendado para ${hour}:${minute} no dia ${day}`);
 }
-
-async function scheduleSend() {
-    const groupIds = Array.from(document.querySelectorAll('#groups input:checked')).map(c=>c.value);
-    const date = document.getElementById('date').value;
-    const time = document.getElementById('time').value;
-    if (!groupIds.length) return alert('Selecione ao menos um grupo');
-    await fetch('/schedule', {method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({groupIds, date, time})});
-    loadScheduled();
-}
-
-async function deleteSchedule(index){
-    await fetch('/scheduled/delete', {method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({index})});
-    loadScheduled();
-}
-
-loadQRCode(); loadGroups(); loadScheduled(); loadHistory();
-setInterval(loadQRCode, 10000);
-setInterval(loadGroups, 10000);
-setInterval(loadScheduled, 10000);
-setInterval(loadHistory, 10000);
+loadQR(); loadGroups();
+setInterval(loadQR,10000);
 </script>
 </body>
 </html>
