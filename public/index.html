@@ -25,15 +25,12 @@ h1,h2 { margin-top:20px; }
 <h2>Agendar Envio</h2>
 <label>Data: <input type="date" id="date"></label>
 <label>Hora: <input type="time" id="time"></label>
-<label>Canal: 
-<select id="channel"></select>
-</label>
 <button onclick="scheduleSend()">Agendar</button>
 
 <h2>Agendamentos</h2>
 <table id="scheduled">
 <thead>
-<tr><th>#</th><th>Data</th><th>Hora</th><th>Canal</th><th>Ação</th></tr>
+<tr><th>#</th><th>Data</th><th>Hora</th><th>Ação</th></tr>
 </thead>
 <tbody></tbody>
 </table>
@@ -56,13 +53,10 @@ async function loadQRCode() {
 
 async function loadGroups() {
     const groups = await fetch('/groups').then(r=>r.json());
-    const container = document.getElementById('groups');
-    container.innerHTML = '';
+    const container = document.getElementById('groups'); container.innerHTML='';
     groups.forEach(g=>{
-        const cb = document.createElement('input');
-        cb.type='checkbox'; cb.value=g.id; cb.id=g.id;
-        const label = document.createElement('label');
-        label.htmlFor=g.id; label.textContent=g.name;
+        const cb = document.createElement('input'); cb.type='checkbox'; cb.value=g.id; cb.id=g.id;
+        const label = document.createElement('label'); label.htmlFor=g.id; label.textContent=g.name;
         container.appendChild(cb); container.appendChild(label);
         container.appendChild(document.createElement('br'));
     });
@@ -73,7 +67,7 @@ async function loadScheduled() {
     const tbody = document.querySelector('#scheduled tbody'); tbody.innerHTML='';
     data.forEach((d,i)=>{
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${i+1}</td><td>${d.date}</td><td>${d.time}</td><td>${d.channelId}</td>
+        tr.innerHTML = `<td>${i+1}</td><td>${d.date}</td><td>${d.time}</td>
         <td><button onclick="deleteSchedule(${i})">Deletar</button></td>`;
         tbody.appendChild(tr);
     });
@@ -91,48 +85,27 @@ async function loadHistory() {
     });
 }
 
-async function loadChannels() {
-    const channels = [
-        {id:"UCh-ceOeY4WVgS8R0onTaXmw", name:"Canal 1"},
-        {id:"OUTRO_ID", name:"Canal 2"}
-    ];
-    const sel = document.getElementById('channel');
-    sel.innerHTML = '';
-    channels.forEach(c=>{
-        const opt=document.createElement('option');
-        opt.value=c.id; opt.text=c.name; sel.appendChild(opt);
-    });
-}
-
 async function scheduleSend() {
-    const selected = Array.from(document.querySelectorAll('#groups input:checked')).map(i=>i.value);
+    const groupIds = Array.from(document.querySelectorAll('#groups input:checked')).map(c=>c.value);
     const date = document.getElementById('date').value;
     const time = document.getElementById('time').value;
-    const channelId = document.getElementById('channel').value;
-    if(!selected.length||!date||!time) return alert('Preencha todos os campos e selecione pelo menos um grupo!');
-    const res = await fetch('/schedule',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({groupIds:selected,date,time,channelId})
-    }).then(r=>r.json());
-    alert(res.message);
+    if (!groupIds.length) return alert('Selecione ao menos um grupo');
+    await fetch('/schedule', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({groupIds, date, time})});
     loadScheduled();
 }
 
-async function deleteSchedule(index) {
-    await fetch('/scheduled/delete',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({index})
-    });
+async function deleteSchedule(index){
+    await fetch('/scheduled/delete', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({index})});
     loadScheduled();
 }
 
-loadQRCode();
-loadGroups();
-loadScheduled();
-loadHistory();
-loadChannels();
+loadQRCode(); loadGroups(); loadScheduled(); loadHistory();
+setInterval(loadQRCode, 10000);
+setInterval(loadGroups, 10000);
+setInterval(loadScheduled, 10000);
+setInterval(loadHistory, 10000);
 </script>
 </body>
 </html>
