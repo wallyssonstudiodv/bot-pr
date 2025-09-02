@@ -1,71 +1,102 @@
-import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
-import qrcode from "qrcode";
+import crypto from 'crypto';
+import { 
+    default: makeWASocket, 
+    DisconnectReason, 
+    useMultiFileAuthState, 
+    fetchLatestBaileysVersion 
+} from "@whiskeysockets/baileys";
 import fs from "fs";
 import fetch from "node-fetch";
+import qrcode from "qrcode";
+import schedule from "node-schedule";
 
-let sockInstance; // socket interno
+const SESSION_DIR = './sessions';
+if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR);
+
+let sock;
+let scheduledJobs = [];
+let history = [];
+
+// Config YouTube
+const YOUTUBE_API_KEY = "AIzaSyDubEpb0TkgZjiyjA9-1QM_56Kwnn_SMPs";
+const CHANNEL_ID = "UCh-ceOeY4WVgS8R0onTaXmw";
 
 export async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('./auth_info_multi');
+    const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
     const { version } = await fetchLatestBaileysVersion();
 
-    sockInstance = makeWASocket({ version, printQRInTerminal: true, auth: state });
+    sock = makeWASocket({ auth: state, version });
 
-    sockInstance.ev.on('creds.update', saveCreds);
-
-    sockInstance.ev.on('connection.update', async update => {
-        const { connection, lastDisconnect, qr } = update;
-
-        if (qr) {
-            console.log("QR gerado. Escaneie para conectar.");
-            const url = await qrcode.toDataURL(qr);
-            fs.writeFileSync('./public/qr.txt', url);
-        }
-
-        if (connection === 'close') {
-            console.log('Conexão fechada. Reconectando...');
-            startBot();
-        }
-
-        if (connection === 'open') {
-            console.log('Bot conectado!');
-        }
+    sock.ev.on('connection.update', (update) => {
+        const { connection, qr } = update;
+        if (qr) qrcode.toDataURL(qr).then(url => fs.writeFileSync('public/qr.txt', url));
+        if (connection === 'close') startBot();
+        else if (connection === 'open') console.log('Conectado ao WhatsApp!');
     });
+
+    sock.ev.on('creds.update', saveCreds);
 }
 
-// Função para acessar o socket
-export function getSock() {
-    if (!sockInstance) throw new Error("Sock não inicializado ainda");
-    return sockInstance;
-}
+export function getSock() { return sock; }
 
-// Listar grupos ativos
 export async function getGroups() {
-    const sock = getSock();
-    const chats = await sock.groupFetchAllParticipating();
-    return Object.values(chats).map(g => ({ id: g.id, name: g.subject }));
+    if (!sock) throw new Error("Bot não conectado");
+    const res = await sock.groupFetchAllParticipating();
+    return Object.values(res).map(g => ({ id: g.id, name: g.subject }));
 }
 
-// Último vídeo de um canal
-export async function getLastVideo(channelId) {
-    const YOUTUBE_API_KEY = "AIzaSyDubEpb0TkgZjiyjA9-1QM_56Kwnn_SMPs";
-    const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&order=date&part=snippet&type=video&maxResults=1`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (!data.items || data.items.length === 0) return null;
-    const video = data.items[0];
+export async function getLastVideo() {
+    const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${CHANNEL_ID}&order=date&part=snippet&type=video&maxResults=1`;
+    const res = await fetch(url).then(r => r.json());
+    if (!res.items || !res.items.length) return null;
+    const v = res.items[0];
     return {
-        title: video.snippet.title,
-        link: `https://www.youtube.com/watch?v=${video.id.videoId}`,
-        thumbnail: video.snippet.thumbnails.high.url
+        title: v.snippet.title,
+        link: `https://www.youtube.com/watch?v=${v.id.videoId}`,
+        thumbnail: v.snippet.thumbnails.high.url
     };
 }
 
-// Enviar vídeo para grupos
-export async function sendVideoToGroups(groupIds, video) {
-    const sock = getSock();
-    const imgBuffer = await (await fetch(video.thumbnail)).buffer();
-    for (let id of groupIds) {
-        await sock.sendMessage(id, { image: imgBuffer, caption: `🚨 Vídeo novo!\n🎬 *${video.title}*\n👉 ${video.link}` });
+export async function sendVideoToGroups(groupsIds, video) {
+    if (!sock) throw new Error("Bot não conectado");
+
+    const imgData = await fetch(video.thumbnail).then(r => r.arrayBuffer());
+    const buffer = Buffer.from(imgData);
+
+    for (let id of groupsIds) {
+        await sock.sendMessage(id, {
+            image: buffer,
+            caption: `🚨 Novo vídeo!\n🎬 ${video.title}\n👉 ${video.link}`
+        });
+    }
+
+    history.push({ date: new Date(), groups: groupsIds, video });
+}
+
+export function scheduleVideo(groupsIds, date, time) {
+    const [hour, minute] = time.split(':').map(Number);
+    const [year, month, day] = date.split('-').map(Number);
+
+    const jobDate = new Date(year, month - 1, day, hour, minute);
+    const job = schedule.scheduleJob(jobDate, async () => {
+        const video = await getLastVideo();
+        if (video) await sendVideoToGroups(groupsIds, video);
+    });
+
+    scheduledJobs.push({ groupsIds, date, time, job });
+}
+
+export function deleteScheduled(index) {
+    if (scheduledJobs[index]) {
+        scheduledJobs[index].job.cancel();
+        scheduledJobs.splice(index, 1);
     }
 }
+
+export function getScheduled() { 
+    return scheduledJobs.map(s => ({
+        date: s.date, time: s.time, groupsIds: s.groupsIds
+    })); 
+}
+
+export function getHistory() { return history; }
