@@ -1,9 +1,7 @@
 import express from "express";
 import fs from "fs";
-import path from "path";
-import qrcode from "qrcode";
 import schedule from "node-schedule";
-import { startBot, sock, getGroups, sendVideoToGroups, getLastVideo } from "./bot.js";
+import { startBot, getGroups, sendVideoToGroups, getLastVideo } from "./bot.js";
 
 const app = express();
 app.use(express.json());
@@ -51,13 +49,14 @@ app.post('/schedule', (req, res) => {
         const video = await getLastVideo(channelId);
         if (!video) return;
 
-        const result = await sendVideoToGroups(groupIds, video);
+        await sendVideoToGroups(groupIds, video);
+
         // Salvar no histórico
         const history = JSON.parse(fs.readFileSync(HISTORY_FILE));
         history.push({
             date: new Date().toISOString(),
             groups: groupIds,
-            video: video
+            video
         });
         fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
     });
@@ -78,11 +77,15 @@ app.post('/scheduled/delete', (req, res) => {
     if (scheduled[index]) {
         scheduled.splice(index, 1);
         fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(scheduled, null, 2));
+
         // Cancelar job
         if (scheduledJobs[index]) scheduledJobs[index].job.cancel();
         scheduledJobs.splice(index, 1);
+
         res.json({ success: true });
-    } else res.json({ success: false, message: 'Agendamento não encontrado' });
+    } else {
+        res.json({ success: false, message: 'Agendamento não encontrado' });
+    }
 });
 
 app.listen(3000, () => console.log('Painel rodando em http://localhost:3000'));
