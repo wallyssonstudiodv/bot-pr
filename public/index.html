@@ -1,75 +1,743 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painel WhatsApp Bot</title>
-<style>
-  body { font-family:sans-serif; background:linear-gradient(135deg,#002266,#660000); color:#fff; display:flex; justify-content:center; padding:10px; }
-  .container { max-width:450px; width:100%; background:rgba(0,0,0,0.6); border-radius:15px; padding:20px; backdrop-filter:blur(10px);}
-  h1,h2{margin:10px 0;}
-  img#qr{width:100%; max-width:250px; display:block; margin:10px auto; border-radius:15px;}
-  #groups{max-height:200px; overflow-y:auto; margin:10px 0; padding:10px; background:rgba(0,0,0,0.3); border-radius:10px;}
-  #groups label{display:flex; justify-content:space-between; align-items:center; padding:5px; margin-bottom:5px; background:rgba(255,255,255,0.05); border-radius:5px; cursor:pointer;}
-  #groups label:hover{background:rgba(255,255,255,0.15);}
-  input[type="checkbox"]{transform:scale(1.2);}
-  button,select,input[type="time"]{width:100%; padding:10px; margin:5px 0; border:none; border-radius:10px; cursor:pointer;}
-  button{background:linear-gradient(90deg,#2196f3,#f44336); color:#fff; font-weight:bold;}
-  button:hover{opacity:0.85;}
-  .scheduler{display:flex; flex-direction:column; gap:5px; margin-top:10px; padding:10px; border-radius:10px; background:rgba(255,255,255,0.05);}
-  @media(min-width:600px){.scheduler{flex-direction:row; justify-content:space-between;} .scheduler select,.scheduler input{width:48%;}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Envios - Wallysson Studio Dv</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+            margin: 10px 0;
+        }
+
+        .credit {
+            font-weight: bold;
+            color: #764ba2;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status-connected {
+            background: #27ae60;
+        }
+
+        .status-disconnected {
+            background: #e74c3c;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .qr-container {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .qr-code {
+            max-width: 250px;
+            border: 3px solid #667eea;
+            border-radius: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        .groups-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .group-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .group-item:last-child {
+            border-bottom: none;
+        }
+
+        .group-item input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+
+        .logs-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8f9fa;
+            font-family: 'Courier New', monospace;
+        }
+
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .log-info {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .log-success {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .log-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .log-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .schedule-item {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+        }
+
+        .schedule-item.active {
+            border-color: #27ae60;
+            background: #e8f5e8;
+        }
+
+        .days-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .day-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .card {
+                padding: 15px;
+            }
+            
+            .btn {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-<h1>WhatsApp Bot</h1>
-<h2>QR Code</h2>
-<img id="qr" src="" alt="QR Code">
-<h2>Grupos</h2>
-<div id="groups"></div>
-<button onclick="sendVideo()">Enviar último vídeo</button>
-<div class="scheduler">
-  <select id="day">
-    <option value="0">Domingo</option>
-    <option value="1">Segunda</option>
-    <option value="2">Terça</option>
-    <option value="3">Quarta</option>
-    <option value="4">Quinta</option>
-    <option value="5">Sexta</option>
-    <option value="6">Sábado</option>
-  </select>
-  <input type="time" id="time" value="12:00">
-  <button onclick="scheduleVideo()">Agendar Envio</button>
-</div>
-</div>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 Auto Envios</h1>
+            <p class="credit">Crédito para <strong>Wallysson Studio Dv 2025</strong></p>
+            <p>✨ <em>"Você sonha, Deus realiza"</em> ✨</p>
+        </div>
 
-<script>
-async function loadQR(){
-    const res = await fetch('qr.txt'); 
-    document.getElementById('qr').src = await res.text();
-}
-async function loadGroups(){
-    const res = await fetch('/groups'); 
-    const groups = await res.json();
-    document.getElementById('groups').innerHTML = groups.map(g=>`
-      <label><span>${g.subject||g.name}</span><input type="checkbox" value="${g.id}"></label>
-    `).join('');
-}
-async function sendVideo(){
-    const checked = [...document.querySelectorAll('#groups input:checked')].map(i=>i.value);
-    if(!checked.length) return alert('Selecione algum grupo!');
-    await fetch('/send-video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({groupIds:checked})});
-    alert('Vídeo enviado!');
-}
-async function scheduleVideo(){
-    const day = document.getElementById('day').value;
-    const time = document.getElementById('time').value.split(':');
-    const hour=parseInt(time[0]), minute=parseInt(time[1]);
-    await fetch('/schedule-video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({day:parseInt(day),hour,minute})});
-    alert(`Envio agendado para ${hour}:${minute} no dia ${day}`);
-}
-loadQR(); loadGroups();
-setInterval(loadQR,10000);
-</script>
+        <!-- Status e Conexão -->
+        <div class="card">
+            <h2>🔗 Conexão WhatsApp 
+                <span id="statusIndicator" class="status-indicator status-disconnected">Desconectado</span>
+            </h2>
+            
+            <div id="connectionButtons">
+                <button id="connectBtn" class="btn">Conectar Bot</button>
+                <button id="disconnectBtn" class="btn btn-danger" disabled>Desconectar</button>
+                <button id="clearSessionBtn" class="btn btn-danger">Limpar Sessão</button>
+            </div>
+
+            <!-- QR Code -->
+            <div id="qrContainer" class="qr-container hidden">
+                <p>📱 Escaneie o QR Code com seu WhatsApp:</p>
+                <img id="qrCode" class="qr-code" alt="QR Code">
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Configurações do YouTube -->
+            <div class="card">
+                <h2>🎥 Configurações YouTube</h2>
+                <div class="form-group">
+                    <label>API Key do YouTube:</label>
+                    <input type="text" id="youtubeApiKey" placeholder="Sua API Key">
+                </div>
+                <div class="form-group">
+                    <label>ID do Canal:</label>
+                    <input type="text" id="channelId" placeholder="ID do canal">
+                </div>
+                <button id="saveConfigBtn" class="btn">Salvar Configurações</button>
+            </div>
+
+            <!-- Grupos WhatsApp -->
+            <div class="card">
+                <h2>👥 Grupos WhatsApp</h2>
+                <button id="refreshGroupsBtn" class="btn">Atualizar Grupos</button>
+                <button id="sendNowBtn" class="btn btn-success">Enviar Agora</button>
+                <div id="groupsList" class="groups-list">
+                    <p>Conecte o bot para ver os grupos...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agendamentos -->
+        <div class="card">
+            <h2>⏰ Agendamentos Automáticos</h2>
+            
+            <div class="form-group">
+                <label>Nome do Agendamento:</label>
+                <input type="text" id="scheduleName" placeholder="Ex: Envio Manhã">
+            </div>
+            
+            <div class="grid" style="grid-template-columns: 1fr 1fr 2fr;">
+                <div class="form-group">
+                    <label>Hora:</label>
+                    <input type="time" id="scheduleTime">
+                </div>
+                
+                <div class="form-group">
+                    <label>Dias da Semana:</label>
+                    <div class="days-selector">
+                        <div class="day-checkbox">
+                            <input type="checkbox" id="day0" value="0">
+                            <label for="day0">Dom</label>
+                        </div>
+                        <div class="day-checkbox">
+                            <input type="checkbox" id="day1" value="1">
+                            <label for="day1">Seg</label>
+                        </div>
+                        <div class="day-checkbox">
+                            <input type="checkbox" id="day2" value="2">
+                            <label for="day2">Ter</label>
+                        </div>
+                        <div class="day-checkbox">
+                            <input type="checkbox" id="day3" value="3">
+                            <label for="day3">Qua</label>
+                        </div>
+                        <div class="day-checkbox">
+                            <input type="checkbox" id="day4" value="4">
+                            <label for="day4">Qui</label>
+                        </div>
+                        <div class="day-checkbox">
+                            <input type="checkbox" id="day5" value="5">
+                            <label for="day5">Sex</label>
+                        </div>
+                        <div class="day-checkbox">
+                            <input type="checkbox" id="day6" value="6">
+                            <label for="day6">Sab</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <button id="addScheduleBtn" class="btn">Adicionar Agendamento</button>
+                </div>
+            </div>
+
+            <div id="schedulesList">
+                <!-- Agendamentos serão adicionados aqui -->
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="card">
+            <h2>📊 Logs em Tempo Real</h2>
+            <button id="clearLogsBtn" class="btn">Limpar Logs</button>
+            <div id="logsContainer" class="logs-container">
+                <div class="log-entry log-info">Sistema iniciado...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentConfig = {};
+        let currentGroups = [];
+
+        // Elementos DOM
+        const statusIndicator = document.getElementById('statusIndicator');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearSessionBtn = document.getElementById('clearSessionBtn');
+        const qrContainer = document.getElementById('qrContainer');
+        const qrCode = document.getElementById('qrCode');
+        const youtubeApiKey = document.getElementById('youtubeApiKey');
+        const channelId = document.getElementById('channelId');
+        const saveConfigBtn = document.getElementById('saveConfigBtn');
+        const refreshGroupsBtn = document.getElementById('refreshGroupsBtn');
+        const sendNowBtn = document.getElementById('sendNowBtn');
+        const groupsList = document.getElementById('groupsList');
+        const logsContainer = document.getElementById('logsContainer');
+        const clearLogsBtn = document.getElementById('clearLogsBtn');
+        const addScheduleBtn = document.getElementById('addScheduleBtn');
+        const schedulesList = document.getElementById('schedulesList');
+
+        // Socket events
+        socket.on('connect', () => {
+            addLog('Conectado ao servidor', 'success');
+            loadConfig();
+        });
+
+        socket.on('botStatus', (data) => {
+            updateStatus(data.connected);
+        });
+
+        socket.on('qrCode', (qrDataUrl) => {
+            if (qrDataUrl) {
+                qrCode.src = qrDataUrl;
+                qrContainer.classList.remove('hidden');
+                addLog('QR Code gerado - escaneie com seu WhatsApp', 'info');
+            } else {
+                qrContainer.classList.add('hidden');
+            }
+        });
+
+        socket.on('groupsList', (groups) => {
+            currentGroups = groups;
+            renderGroups(groups);
+        });
+
+        socket.on('log', (logData) => {
+            addLog(logData.message, logData.type);
+        });
+
+        socket.on('initResult', (result) => {
+            if (result.success) {
+                addLog('Bot inicializado com sucesso', 'success');
+            } else {
+                addLog('Erro ao inicializar bot', 'error');
+            }
+        });
+
+        socket.on('disconnectResult', (result) => {
+            if (result.success) {
+                addLog('Bot desconectado e sessão limpa', 'info');
+                updateStatus(false);
+            } else {
+                addLog('Erro ao desconectar: ' + result.error, 'error');
+            }
+        });
+
+        socket.on('sendResult', (result) => {
+            if (result.success) {
+                addLog('Vídeo enviado com sucesso!', 'success');
+            } else {
+                addLog('Erro ao enviar vídeo: ' + result.error, 'error');
+            }
+        });
+
+        // Event listeners
+        connectBtn.addEventListener('click', () => {
+            socket.emit('initBot');
+            addLog('Iniciando bot...', 'info');
+        });
+
+        disconnectBtn.addEventListener('click', () => {
+            socket.emit('disconnectBot');
+            addLog('Desconectando bot...', 'info');
+        });
+
+        clearSessionBtn.addEventListener('click', () => {
+            socket.emit('disconnectBot');
+            addLog('Limpando sessão...', 'info');
+        });
+
+        saveConfigBtn.addEventListener('click', () => {
+            saveConfig();
+        });
+
+        refreshGroupsBtn.addEventListener('click', () => {
+            socket.emit('getGroups');
+            addLog('Atualizando lista de grupos...', 'info');
+        });
+
+        sendNowBtn.addEventListener('click', () => {
+            const selectedGroups = getSelectedGroups();
+            if (selectedGroups.length === 0) {
+                addLog('Selecione pelo menos um grupo', 'warning');
+                return;
+            }
+            
+            socket.emit('sendVideoNow', selectedGroups);
+            addLog(`Enviando vídeo para ${selectedGroups.length} grupos...`, 'info');
+        });
+
+        addScheduleBtn.addEventListener('click', () => {
+            addSchedule();
+        });
+
+        clearLogsBtn.addEventListener('click', () => {
+            logsContainer.innerHTML = '<div class="log-entry log-info">Logs limpos...</div>';
+        });
+
+        // Functions
+        function updateStatus(connected) {
+            if (connected) {
+                statusIndicator.textContent = 'Conectado';
+                statusIndicator.className = 'status-indicator status-connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                statusIndicator.textContent = 'Desconectado';
+                statusIndicator.className = 'status-indicator status-disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                qrContainer.classList.add('hidden');
+            }
+        }
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleString('pt-BR');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            
+            logsContainer.appendChild(logEntry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+
+            // Manter apenas os últimos 100 logs
+            const logs = logsContainer.children;
+            if (logs.length > 100) {
+                logsContainer.removeChild(logs[0]);
+            }
+        }
+
+        function renderGroups(groups) {
+            if (groups.length === 0) {
+                groupsList.innerHTML = '<p>Nenhum grupo encontrado</p>';
+                return;
+            }
+
+            const html = groups.map(group => `
+                <div class="group-item">
+                    <input type="checkbox" id="group_${group.id}" value="${group.id}" ${currentConfig.activeGroups?.includes(group.id) ? 'checked' : ''}>
+                    <label for="group_${group.id}">
+                        <strong>${group.name}</strong> (${group.participants} participantes)
+                    </label>
+                </div>
+            `).join('');
+
+            groupsList.innerHTML = html;
+        }
+
+        function getSelectedGroups() {
+            const checkboxes = groupsList.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                currentConfig = await response.json();
+                
+                youtubeApiKey.value = currentConfig.youtubeApiKey || '';
+                channelId.value = currentConfig.channelId || '';
+                
+                renderSchedules();
+                addLog('Configurações carregadas', 'info');
+            } catch (error) {
+                addLog('Erro ao carregar configurações: ' + error.message, 'error');
+            }
+        }
+
+        async function saveConfig() {
+            try {
+                const selectedGroups = getSelectedGroups();
+                
+                const config = {
+                    ...currentConfig,
+                    youtubeApiKey: youtubeApiKey.value,
+                    channelId: channelId.value,
+                    activeGroups: selectedGroups
+                };
+
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentConfig = config;
+                    addLog('Configurações salvas com sucesso', 'success');
+                } else {
+                    addLog('Erro ao salvar configurações', 'error');
+                }
+            } catch (error) {
+                addLog('Erro ao salvar configurações: ' + error.message, 'error');
+            }
+        }
+
+        function addSchedule() {
+            const name = document.getElementById('scheduleName').value;
+            const time = document.getElementById('scheduleTime').value;
+            
+            if (!name || !time) {
+                addLog('Preencha nome e horário do agendamento', 'warning');
+                return;
+            }
+
+            const selectedDays = [];
+            for (let i = 0; i <= 6; i++) {
+                if (document.getElementById(`day${i}`).checked) {
+                    selectedDays.push(i);
+                }
+            }
+
+            if (selectedDays.length === 0) {
+                addLog('Selecione pelo menos um dia da semana', 'warning');
+                return;
+            }
+
+            const [hour, minute] = time.split(':');
+            
+            const schedule = {
+                id: Date.now(),
+                name,
+                hour: parseInt(hour),
+                minute: parseInt(minute),
+                days: selectedDays,
+                active: true
+            };
+
+            if (!currentConfig.schedules) {
+                currentConfig.schedules = [];
+            }
+
+            currentConfig.schedules.push(schedule);
+            saveSchedules();
+            renderSchedules();
+            clearScheduleForm();
+            
+            addLog(`Agendamento "${name}" adicionado`, 'success');
+        }
+
+        function removeSchedule(id) {
+            currentConfig.schedules = currentConfig.schedules.filter(s => s.id !== id);
+            saveSchedules();
+            renderSchedules();
+            addLog('Agendamento removido', 'info');
+        }
+
+        function toggleSchedule(id) {
+            const schedule = currentConfig.schedules.find(s => s.id === id);
+            if (schedule) {
+                schedule.active = !schedule.active;
+                saveSchedules();
+                renderSchedules();
+                addLog(`Agendamento ${schedule.active ? 'ativado' : 'desativado'}`, 'info');
+            }
+        }
+
+        async function saveSchedules() {
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentConfig)
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    addLog('Erro ao salvar agendamentos', 'error');
+                }
+            } catch (error) {
+                addLog('Erro ao salvar agendamentos: ' + error.message, 'error');
+            }
+        }
+
+        function renderSchedules() {
+            if (!currentConfig.schedules || currentConfig.schedules.length === 0) {
+                schedulesList.innerHTML = '<p>Nenhum agendamento configurado</p>';
+                return;
+            }
+
+            const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+            
+            const html = currentConfig.schedules.map(schedule => {
+                const daysText = schedule.days.map(d => dayNames[d]).join(', ');
+                const timeText = `${schedule.hour.toString().padStart(2, '0')}:${schedule.minute.toString().padStart(2, '0')}`;
+                
+                return `
+                    <div class="schedule-item ${schedule.active ? 'active' : ''}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <strong>${schedule.name}</strong><br>
+                                <small>${timeText} - ${daysText}</small>
+                            </div>
+                            <div>
+                                <button class="btn ${schedule.active ? 'btn-danger' : 'btn-success'}" onclick="toggleSchedule(${schedule.id})">
+                                    ${schedule.active ? 'Desativar' : 'Ativar'}
+                                </button>
+                                <button class="btn btn-danger" onclick="removeSchedule(${schedule.id})">Remover</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            schedulesList.innerHTML = html;
+        }
+
+        function clearScheduleForm() {
+            document.getElementById('scheduleName').value = '';
+            document.getElementById('scheduleTime').value = '';
+            for (let i = 0; i <= 6; i++) {
+                document.getElementById(`day${i}`).checked = false;
+            }
+        }
+
+        // Tornar funções globais para onclick
+        window.toggleSchedule = toggleSchedule;
+        window.removeSchedule = removeSchedule;
+
+        // Inicializar
+        updateStatus(false);
+        addLog('Interface carregada - conecte o bot para começar', 'info');
+    </script>
 </body>
 </html>
