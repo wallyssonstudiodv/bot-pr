@@ -1,91 +1,39 @@
 import express from "express";
-import fs from "fs";
-import schedule from "node-schedule";
-import { startBot, getGroups, sendVideoToGroups, getLastVideo } from "./bot.js";
+import path from "path";
+import { fileURLToPath } from "url";
+import bodyParser from "body-parser";
+
+import { 
+    startBot, getGroups, getLastVideo, sendVideoToGroups, 
+    scheduleVideo, getScheduled, deleteScheduled, getHistory 
+} from "./bot.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.json());
-app.use(express.static('public'));
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, "public")));
 
-// Pastas de dados
-const SCHEDULE_FILE = './data/scheduled.json';
-const HISTORY_FILE = './data/history.json';
-if (!fs.existsSync('./data')) fs.mkdirSync('./data');
-if (!fs.existsSync(SCHEDULE_FILE)) fs.writeFileSync(SCHEDULE_FILE, JSON.stringify([]));
-if (!fs.existsSync(HISTORY_FILE)) fs.writeFileSync(HISTORY_FILE, JSON.stringify([]));
+await startBot();
 
-// Variáveis para agendamentos
-let scheduledJobs = [];
-
-// Inicializa bot
-startBot();
-
-// Listar grupos ativos
-app.get('/groups', async (req, res) => {
-    const groups = await getGroups();
-    res.json(groups);
+app.get("/groups", async (req,res) => {
+    try { res.json(await getGroups()); } catch(e){ res.json([]); }
 });
 
-// Listar agendamentos
-app.get('/scheduled', (req, res) => {
-    const data = JSON.parse(fs.readFileSync(SCHEDULE_FILE));
-    res.json(data);
+app.get("/scheduled", (req,res)=>res.json(getScheduled()));
+app.get("/history", (req,res)=>res.json(getHistory()));
+
+app.post("/schedule", async (req,res)=>{
+    const { groupIds, date, time } = req.body;
+    scheduleVideo(groupIds, date, time);
+    res.json({ message: "Agendamento criado com sucesso!" });
 });
 
-// Listar histórico
-app.get('/history', (req, res) => {
-    const data = JSON.parse(fs.readFileSync(HISTORY_FILE));
-    res.json(data);
-});
-
-// Agendar envio
-app.post('/schedule', (req, res) => {
-    const { groupIds, date, time, channelId } = req.body;
-    const [hour, minute] = time.split(':').map(Number);
-    const [year, month, day] = date.split('-').map(Number);
-    const jobDate = new Date(year, month - 1, day, hour, minute);
-
-    const job = schedule.scheduleJob(jobDate, async () => {
-        const video = await getLastVideo(channelId);
-        if (!video) return;
-
-        await sendVideoToGroups(groupIds, video);
-
-        // Salvar no histórico
-        const history = JSON.parse(fs.readFileSync(HISTORY_FILE));
-        history.push({
-            date: new Date().toISOString(),
-            groups: groupIds,
-            video
-        });
-        fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-    });
-
-    // Salvar agendamento
-    const scheduled = JSON.parse(fs.readFileSync(SCHEDULE_FILE));
-    scheduled.push({ groupIds, date, time, channelId });
-    fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(scheduled, null, 2));
-
-    scheduledJobs.push({ job, groupIds, date, time, channelId });
-    res.json({ success: true, message: 'Agendamento criado com sucesso!' });
-});
-
-// Deletar agendamento
-app.post('/scheduled/delete', (req, res) => {
+app.post("/scheduled/delete", (req,res)=>{
     const { index } = req.body;
-    const scheduled = JSON.parse(fs.readFileSync(SCHEDULE_FILE));
-    if (scheduled[index]) {
-        scheduled.splice(index, 1);
-        fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(scheduled, null, 2));
-
-        // Cancelar job
-        if (scheduledJobs[index]) scheduledJobs[index].job.cancel();
-        scheduledJobs.splice(index, 1);
-
-        res.json({ success: true });
-    } else {
-        res.json({ success: false, message: 'Agendamento não encontrado' });
-    }
+    deleteScheduled(index);
+    res.json({ message: "Agendamento deletado!" });
 });
 
-app.listen(3000, () => console.log('Painel rodando em http://localhost:3000'));
+app.listen(3000, ()=>console.log("Servidor rodando na porta 3000"));
