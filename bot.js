@@ -3,22 +3,17 @@ import qrcode from "qrcode";
 import fs from "fs";
 import fetch from "node-fetch";
 
-let sock;
-
-const CHANNELS = [
-    { id: "UCh-ceOeY4WVgS8R0onTaXmw", name: "Canal 1" },
-    { id: "OUTRO_ID", name: "Canal 2" }
-];
+let sockInstance; // socket interno
 
 export async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('./auth_info_multi');
     const { version } = await fetchLatestBaileysVersion();
 
-    sock = makeWASocket({ version, printQRInTerminal: true, auth: state });
+    sockInstance = makeWASocket({ version, printQRInTerminal: true, auth: state });
 
-    sock.ev.on('creds.update', saveCreds);
+    sockInstance.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', async update => {
+    sockInstance.ev.on('connection.update', async update => {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
@@ -38,11 +33,20 @@ export async function startBot() {
     });
 }
 
+// Função para acessar o socket
+export function getSock() {
+    if (!sockInstance) throw new Error("Sock não inicializado ainda");
+    return sockInstance;
+}
+
+// Listar grupos ativos
 export async function getGroups() {
+    const sock = getSock();
     const chats = await sock.groupFetchAllParticipating();
     return Object.values(chats).map(g => ({ id: g.id, name: g.subject }));
 }
 
+// Último vídeo de um canal
 export async function getLastVideo(channelId) {
     const YOUTUBE_API_KEY = "AIzaSyDubEpb0TkgZjiyjA9-1QM_56Kwnn_SMPs";
     const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&order=date&part=snippet&type=video&maxResults=1`;
@@ -57,7 +61,9 @@ export async function getLastVideo(channelId) {
     };
 }
 
+// Enviar vídeo para grupos
 export async function sendVideoToGroups(groupIds, video) {
+    const sock = getSock();
     const imgBuffer = await (await fetch(video.thumbnail)).buffer();
     for (let id of groupIds) {
         await sock.sendMessage(id, { image: imgBuffer, caption: `🚨 Vídeo novo!\n🎬 *${video.title}*\n👉 ${video.link}` });
