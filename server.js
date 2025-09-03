@@ -1,9 +1,12 @@
+GNU nano 4.8                server.js
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs-extra');
 const cron = require('node-cron');
+const crypto = require('crypto');
+globalThis.crypto = crypto;0
 
 console.log('🚀 Iniciando Auto Envios Bot...');
 
