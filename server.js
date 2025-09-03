@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const cron = require('node-cron');
 const crypto = require('crypto');
-globalThis.crypto = crypto;0
+globalThis.crypto = crypto;
 
 console.log('🚀 Iniciando Auto Envios Bot...');
 
@@ -41,11 +41,17 @@ let activeTasks = new Map(); // Para gerenciar cron jobs
 
 // Configurações padrão
 const defaultConfig = {
-  youtubeApiKey: "AIzaSyDubEpb0TkgZjiyjA9-1QM_56Kwnn_SMPs",
-  channelId: "UCh-ceOeY4WVgS8R0onTaXmw",
+  youtubeApiKey: "",
+  channelId: "",
   schedules: [],
   activeGroups: [],
-  botConnected: false
+  botConnected: false,
+  antiBanSettings: {
+    delayBetweenGroups: 5, // segundos entre envios para grupos diferentes
+    delayBetweenMessages: 2, // segundos entre mensagens no mesmo grupo
+    maxGroupsPerBatch: 10, // máximo de grupos por lote
+    batchDelay: 30 // segundos entre lotes
+  }
 };
 
 // Função para log
@@ -97,13 +103,75 @@ async function saveConfig(config) {
   }
 }
 
+// Função para envio com anti-banimento
+async function sendVideoWithAntiBot(groupIds, config) {
+  if (!whatsappBot || !whatsappBot.isConnected()) {
+    throw new Error('Bot não conectado');
+  }
+
+  const { antiBanSettings } = config;
+  const totalGroups = groupIds.length;
+  
+  log(`Iniciando envio para ${totalGroups} grupos com proteção anti-banimento`, 'info');
+  
+  // Dividir grupos em lotes
+  const batches = [];
+  for (let i = 0; i < groupIds.length; i += antiBanSettings.maxGroupsPerBatch) {
+    batches.push(groupIds.slice(i, i + antiBanSettings.maxGroupsPerBatch));
+  }
+  
+  log(`Dividido em ${batches.length} lotes de até ${antiBanSettings.maxGroupsPerBatch} grupos`, 'info');
+  
+  let sentCount = 0;
+  
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batch = batches[batchIndex];
+    
+    log(`Processando lote ${batchIndex + 1}/${batches.length}`, 'info');
+    
+    for (let groupIndex = 0; groupIndex < batch.length; groupIndex++) {
+      const groupId = batch[groupIndex];
+      
+      try {
+        await whatsappBot.sendLatestVideoToGroup(groupId);
+        sentCount++;
+        
+        log(`✅ Enviado para grupo ${sentCount}/${totalGroups}`, 'success');
+        
+        // Delay entre grupos (exceto o último do lote)
+        if (groupIndex < batch.length - 1) {
+          log(`⏳ Aguardando ${antiBanSettings.delayBetweenGroups}s antes do próximo grupo...`, 'info');
+          await new Promise(resolve => setTimeout(resolve, antiBanSettings.delayBetweenGroups * 1000));
+        }
+        
+      } catch (error) {
+        log(`❌ Erro ao enviar para grupo: ${error.message}`, 'error');
+      }
+    }
+    
+    // Delay entre lotes (exceto o último)
+    if (batchIndex < batches.length - 1) {
+      log(`⏳ Aguardando ${antiBanSettings.batchDelay}s antes do próximo lote...`, 'info');
+      await new Promise(resolve => setTimeout(resolve, antiBanSettings.batchDelay * 1000));
+    }
+  }
+  
+  log(`✅ Envio completo: ${sentCount}/${totalGroups} grupos`, 'success');
+  return sentCount;
+}
+
 // Inicializar bot
 async function initializeBot() {
   try {
     log('Inicializando WhatsApp Bot...', 'info');
     
     if (whatsappBot) {
-      await whatsappBot.disconnect();
+      try {
+        await whatsappBot.disconnect();
+        whatsappBot = null;
+      } catch (error) {
+        log('Aviso ao desconectar bot anterior: ' + error.message, 'warning');
+      }
     }
     
     whatsappBot = new WhatsAppBot(io, log);
@@ -111,7 +179,7 @@ async function initializeBot() {
     
     // Carregar e configurar agendamentos
     const config = await loadConfig();
-    setupSchedules(config.schedules);
+    setupSchedules(config.schedules, config);
     
     log('Bot inicializado com sucesso', 'success');
     return true;
@@ -122,10 +190,16 @@ async function initializeBot() {
 }
 
 // Configurar agendamentos
-function setupSchedules(schedules) {
+function setupSchedules(schedules, config) {
   try {
     // Limpar agendamentos existentes
-    activeTasks.forEach(task => task.destroy());
+    activeTasks.forEach(task => {
+      try {
+        task.destroy();
+      } catch (error) {
+        log('Erro ao limpar tarefa: ' + error.message, 'warning');
+      }
+    });
     activeTasks.clear();
     
     if (!schedules || schedules.length === 0) {
@@ -134,37 +208,36 @@ function setupSchedules(schedules) {
     }
     
     schedules.forEach(schedule => {
-      if (schedule.active && schedule.days && schedule.days.length > 0) {
+      if (schedule.active && schedule.days && schedule.days.length > 0 && schedule.selectedGroups && schedule.selectedGroups.length > 0) {
         // Converter dias para formato cron (0=domingo, 1=segunda, etc)
         const cronDays = schedule.days.join(',');
         const cronTime = `${schedule.minute} ${schedule.hour} * * ${cronDays}`;
         
-        log(`Configurando agendamento: ${schedule.name} - ${cronTime}`, 'info');
+        log(`Configurando agendamento: ${schedule.name} - ${cronTime} - ${schedule.selectedGroups.length} grupos`, 'info');
         
         const task = cron.schedule(cronTime, async () => {
           if (whatsappBot && whatsappBot.isConnected()) {
             try {
-              const config = await loadConfig();
-              if (config.activeGroups && config.activeGroups.length > 0) {
-                await whatsappBot.sendLatestVideo(config.activeGroups);
-                log(`✅ Vídeo enviado automaticamente - ${schedule.name}`, 'success');
-              } else {
-                log(`⚠️ Nenhum grupo ativo para envio - ${schedule.name}`, 'warning');
-              }
+              log(`🕐 Executando agendamento: ${schedule.name}`, 'info');
+              await sendVideoWithAntiBot(schedule.selectedGroups, config);
+              log(`✅ Agendamento executado: ${schedule.name}`, 'success');
             } catch (error) {
-              log(`❌ Erro no envio automático - ${schedule.name}: ${error.message}`, 'error');
+              log(`❌ Erro no agendamento ${schedule.name}: ${error.message}`, 'error');
             }
           } else {
             log(`⚠️ Bot desconectado - agendamento ${schedule.name} ignorado`, 'warning');
           }
         }, {
-          scheduled: false // Não iniciar imediatamente
+          scheduled: false,
+          timezone: "America/Sao_Paulo"
         });
         
         task.start();
         activeTasks.set(schedule.id, task);
         
         log(`✅ Agendamento ativo: ${schedule.name}`, 'success');
+      } else {
+        log(`⚠️ Agendamento inválido ignorado: ${schedule.name}`, 'warning');
       }
     });
     
@@ -195,26 +268,71 @@ io.on('connection', (socket) => {
     log('Solicitação de desconexão do bot', 'info');
     
     try {
+      // Parar agendamentos
+      activeTasks.forEach(task => {
+        try {
+          task.destroy();
+        } catch (error) {
+          log('Erro ao parar tarefa: ' + error.message, 'warning');
+        }
+      });
+      activeTasks.clear();
+      
+      // Desconectar bot
       if (whatsappBot) {
         await whatsappBot.disconnect();
         whatsappBot = null;
       }
       
-      // Limpar agendamentos
-      activeTasks.forEach(task => task.destroy());
-      activeTasks.clear();
-      
-      // Limpar sessão
-      if (await fs.pathExists('./sessions')) {
-        await fs.remove('./sessions');
-        log('Sessão limpa', 'info');
-      }
-      
       socket.emit('disconnectResult', { success: true });
       io.emit('botStatus', { connected: false });
+      log('Bot desconectado com sucesso', 'success');
     } catch (error) {
       log('Erro ao desconectar: ' + error.message, 'error');
       socket.emit('disconnectResult', { success: false, error: error.message });
+    }
+  });
+  
+  // Limpar sessão
+  socket.on('clearSession', async () => {
+    log('Solicitação de limpeza de sessão', 'info');
+    
+    try {
+      // Parar agendamentos
+      activeTasks.forEach(task => {
+        try {
+          task.destroy();
+        } catch (error) {
+          log('Erro ao parar tarefa: ' + error.message, 'warning');
+        }
+      });
+      activeTasks.clear();
+      
+      // Desconectar bot
+      if (whatsappBot) {
+        await whatsappBot.disconnect();
+        whatsappBot = null;
+      }
+      
+      // Aguardar um pouco para garantir desconexão
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Limpar diretório de sessões
+      const sessionsPath = './sessions';
+      if (await fs.pathExists(sessionsPath)) {
+        await fs.remove(sessionsPath);
+        log('Diretório de sessões removido', 'info');
+      }
+      
+      // Recriar diretório vazio
+      await fs.ensureDir(sessionsPath);
+      
+      socket.emit('clearSessionResult', { success: true });
+      io.emit('botStatus', { connected: false });
+      log('Sessão limpa com sucesso', 'success');
+    } catch (error) {
+      log('Erro ao limpar sessão: ' + error.message, 'error');
+      socket.emit('clearSessionResult', { success: false, error: error.message });
     }
   });
   
@@ -243,7 +361,8 @@ io.on('connection', (socket) => {
     
     if (whatsappBot && whatsappBot.isConnected()) {
       try {
-        await whatsappBot.sendLatestVideo(groupIds);
+        const config = await loadConfig();
+        await sendVideoWithAntiBot(groupIds, config);
         socket.emit('sendResult', { success: true });
         log('✅ Envio manual concluído', 'success');
       } catch (error) {
@@ -278,7 +397,7 @@ app.post('/api/config', async (req, res) => {
     const saved = await saveConfig(newConfig);
     
     if (saved && req.body.schedules) {
-      setupSchedules(req.body.schedules);
+      setupSchedules(req.body.schedules, newConfig);
     }
     
     res.json({ success: saved });
@@ -323,11 +442,23 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('SIGINT', async () => {
   log('Encerrando aplicação...', 'info');
   
-  if (whatsappBot) {
-    await whatsappBot.disconnect();
-  }
+  // Parar agendamentos
+  activeTasks.forEach(task => {
+    try {
+      task.destroy();
+    } catch (error) {
+      log('Erro ao parar tarefa: ' + error.message, 'warning');
+    }
+  });
   
-  activeTasks.forEach(task => task.destroy());
+  // Desconectar bot
+  if (whatsappBot) {
+    try {
+      await whatsappBot.disconnect();
+    } catch (error) {
+      log('Erro ao desconectar bot: ' + error.message, 'warning');
+    }
+  }
   
   server.close(() => {
     log('Servidor encerrado', 'info');
