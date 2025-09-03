@@ -86,7 +86,7 @@ async function saveConfig(config) {
   }
 }
 
-// Envio com anti-ban
+// Envio de vídeo com thumbnail e mensagem personalizada
 async function sendVideoWithAntiBot(groupIds, config) {
   if (!whatsappBot || !whatsappBot.isConnected()) throw new Error('Bot não conectado');
   const { antiBanSettings } = config;
@@ -108,9 +108,19 @@ async function sendVideoWithAntiBot(groupIds, config) {
     for (let groupIndex = 0; groupIndex < batch.length; groupIndex++) {
       const groupId = batch[groupIndex];
       try {
-        await whatsappBot.sendLatestVideoToGroup(groupId);
+        // Busca último vídeo
+        const video = await whatsappBot.getLatestVideo(config.youtubeApiKey, config.channelId);
+
+        const message = {
+          image: { url: video.thumbnail },
+          caption: `🎥 *Novo vídeo no canal!*\n\n*${video.title}*\n\n${video.description.substring(0, 200)}${video.description.length > 200 ? '...' : ''}\n\n🔗 ${video.url}\n\n✨ Compartilhem com a família e amigos, Jesus Cristo abençoe 🙏💖`
+        };
+
+        await whatsappBot.sock.sendMessage(groupId, message);
+
         sentCount++;
         log(`✅ Enviado para grupo ${sentCount}/${totalGroups}`, 'success');
+
         if (groupIndex < batch.length - 1) {
           log(`⏳ Aguardando ${antiBanSettings.delayBetweenGroups}s antes do próximo grupo...`, 'info');
           await new Promise(resolve => setTimeout(resolve, antiBanSettings.delayBetweenGroups * 1000));
@@ -274,8 +284,13 @@ app.post('/api/config', async (req, res) => {
 });
 
 app.get('/api/config', async (req, res) => {
-  try { const config = await loadConfig(); res.json(config); }
-  catch (error) { log('Erro ao obter configurações: ' + error.message, 'error'); res.status(500).json({ success: false, error: error.message }); }
+  try {
+    const config = await loadConfig();
+    res.json(config);
+  } catch (error) {
+    log('Erro ao obter configurações: ' + error.message, 'error');
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.get('/api/status', (req, res) => {
@@ -287,15 +302,25 @@ app.get('/api/status', (req, res) => {
 });
 
 // Tratamento de erros globais
-process.on('uncaughtException', (error) => { log('Erro não capturado: ' + error.message, 'error'); console.error(error.stack); });
-process.on('unhandledRejection', (reason, promise) => { log('Promise rejeitada: ' + reason, 'error'); console.error('Promise rejeitada em:', promise, 'razão:', reason); });
+process.on('uncaughtException', (error) => {
+  log('Erro não capturado: ' + error.message, 'error');
+  console.error(error.stack);
+});
 
-// Graceful shutdown
+process.on('unhandledRejection', (reason, promise) => {
+  log('Promise rejeitada: ' + reason, 'error');
+  console.error('Promise rejeitada em:', promise, 'razão:', reason);
+});
+
+// Encerramento gracioso
 process.on('SIGINT', async () => {
   log('Encerrando aplicação...', 'info');
   activeTasks.forEach(task => { try { task.destroy(); } catch {} });
   if (whatsappBot) { try { await whatsappBot.disconnect(); } catch {} }
-  server.close(() => { log('Servidor encerrado', 'info'); process.exit(0); });
+  server.close(() => {
+    log('Servidor encerrado', 'info');
+    process.exit(0);
+  });
 });
 
 // Iniciar servidor
