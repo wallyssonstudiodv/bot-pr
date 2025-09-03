@@ -2,6 +2,7 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = requi
 const fs = require('fs-extra');
 const axios = require('axios');
 const path = require('path');
+const P = require('pino'); // logger correto do Baileys
 
 class WhatsAppBot {
   constructor(io, logger) {
@@ -17,18 +18,14 @@ class WhatsAppBot {
   async initialize() {
     try {
       this.log('Iniciando conexão com WhatsApp...', 'info');
-      
-      // Configurar autenticação
+
       const { state, saveCreds } = await useMultiFileAuthState('./sessions');
-      
-      // Criar socket
+
       this.sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
-        logger: {
-          level: 'silent',
-          child: () => ({ level: 'silent' })
-        },
+        // logger do Baileys precisa ser Pino
+        logger: P({ level: 'silent' }),
         browser: ['Auto Envios Bot', 'Chrome', '1.0.0'],
         defaultQueryTimeoutMs: 60000,
         connectTimeoutMs: 60000,
@@ -37,7 +34,6 @@ class WhatsAppBot {
         generateHighQualityLinkPreview: true
       });
 
-      // Event handlers
       this.sock.ev.on('creds.update', saveCreds);
       this.sock.ev.on('connection.update', this.handleConnectionUpdate.bind(this));
       this.sock.ev.on('messages.upsert', this.handleMessages.bind(this));
@@ -51,10 +47,9 @@ class WhatsAppBot {
 
   handleConnectionUpdate(update) {
     const { connection, lastDisconnect, qr } = update;
-    
+
     if (qr) {
       this.log('QR Code recebido', 'info');
-      // Converter QR para base64 e enviar para interface
       const QRCode = require('qrcode');
       QRCode.toDataURL(qr)
         .then(qrDataUrl => {
@@ -67,13 +62,13 @@ class WhatsAppBot {
 
     if (connection === 'close') {
       const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
-      
+
       this.log('Conexão fechada. Motivo: ' + lastDisconnect?.error?.output?.statusCode, 'warning');
-      
+
       this.isConnectedFlag = false;
       this.io.emit('botStatus', { connected: false });
       this.io.emit('qrCode', null);
-      
+
       if (shouldReconnect && this.retryCount < this.maxRetries) {
         this.retryCount++;
         this.log(`Tentando reconectar... (${this.retryCount}/${this.maxRetries})`, 'info');
@@ -88,15 +83,12 @@ class WhatsAppBot {
       this.retryCount = 0;
       this.io.emit('botStatus', { connected: true });
       this.io.emit('qrCode', null);
-      
-      // Carregar grupos após conexão
+
       setTimeout(() => this.loadGroups(), 2000);
     }
   }
 
   handleMessages(m) {
-    // Processar mensagens recebidas se necessário
-    // Por enquanto apenas log básico
     try {
       const msg = m.messages[0];
       if (msg?.key?.fromMe === false) {
@@ -110,11 +102,11 @@ class WhatsAppBot {
   async loadGroups() {
     try {
       if (!this.sock) return;
-      
+
       this.log('Carregando grupos...', 'info');
-      
+
       const groups = await this.sock.groupFetchAllParticipating();
-      
+
       this.groups = Object.values(groups).map(group => ({
         id: group.id,
         name: group.subject || 'Grupo sem nome',
@@ -122,12 +114,10 @@ class WhatsAppBot {
         description: group.desc || '',
         owner: group.owner || ''
       }));
-      
+
       this.log(`${this.groups.length} grupos carregados`, 'success');
-      
-      // Emitir grupos para interface
       this.io.emit('groupsList', this.groups);
-      
+
     } catch (error) {
       this.log('Erro ao carregar grupos: ' + error.message, 'error');
       this.groups = [];
@@ -148,7 +138,7 @@ class WhatsAppBot {
       }
 
       this.log('Buscando último vídeo do canal...', 'info');
-      
+
       const response = await axios.get('https://www.googleapis.com/youtube/v3/search', {
         params: {
           key: youtubeApiKey,
@@ -171,7 +161,7 @@ class WhatsAppBot {
           publishedAt: video.snippet.publishedAt,
           url: `https://www.youtube.com/watch?v=${video.id.videoId}`
         };
-        
+
         this.log(`Vídeo encontrado: ${videoData.title}`, 'success');
         return videoData;
       } else {
@@ -189,28 +179,22 @@ class WhatsAppBot {
         throw new Error('Bot não conectado');
       }
 
-      // Buscar configurações
       const configPath = './config/settings.json';
       let config = {};
-      
+
       if (await fs.pathExists(configPath)) {
         config = await fs.readJSON(configPath);
       }
 
-      // Buscar último vídeo
       const video = await this.getLatestVideo(config.youtubeApiKey, config.channelId);
-      
-      // Preparar mensagem
+
       const message = `🎥 *Novo vídeo no canal!*\n\n*${video.title}*\n\n${video.description.substring(0, 200)}${video.description.length > 200 ? '...' : ''}\n\n🔗 ${video.url}`;
-      
-      // Enviar mensagem
-      await this.sock.sendMessage(groupId, { 
-        text: message 
-      });
-      
+
+      await this.sock.sendMessage(groupId, { text: message });
+
       this.log(`Vídeo enviado para grupo: ${groupId}`, 'success');
       return true;
-      
+
     } catch (error) {
       this.log(`Erro ao enviar vídeo para grupo ${groupId}: ${error.message}`, 'error');
       throw error;
@@ -229,48 +213,41 @@ class WhatsAppBot {
 
       this.log(`Iniciando envio para ${groupIds.length} grupos`, 'info');
 
-      // Buscar configurações
       const configPath = './config/settings.json';
       let config = {};
-      
+
       if (await fs.pathExists(configPath)) {
         config = await fs.readJSON(configPath);
       }
 
-      // Buscar último vídeo
       const video = await this.getLatestVideo(config.youtubeApiKey, config.channelId);
-      
-      // Preparar mensagem
+
       const message = `🎥 *Novo vídeo no canal!*\n\n*${video.title}*\n\n${video.description.substring(0, 200)}${video.description.length > 200 ? '...' : ''}\n\n🔗 ${video.url}`;
-      
+
       let successCount = 0;
       let errorCount = 0;
 
-      // Enviar para cada grupo com delay
       for (let i = 0; i < groupIds.length; i++) {
         try {
-          await this.sock.sendMessage(groupIds[i], { 
-            text: message 
-          });
-          
+          await this.sock.sendMessage(groupIds[i], { text: message });
+
           successCount++;
           this.log(`Enviado para grupo ${i + 1}/${groupIds.length}`, 'success');
-          
-          // Delay entre envios (exceto o último)
+
           if (i < groupIds.length - 1) {
             const delay = config.antiBanSettings?.delayBetweenGroups || 5;
             await new Promise(resolve => setTimeout(resolve, delay * 1000));
           }
-          
+
         } catch (error) {
           errorCount++;
           this.log(`Erro ao enviar para grupo ${i + 1}: ${error.message}`, 'error');
         }
       }
-      
+
       this.log(`Envio concluído: ${successCount} sucessos, ${errorCount} erros`, 'info');
       return { successCount, errorCount };
-      
+
     } catch (error) {
       this.log('Erro no envio em lote: ' + error.message, 'error');
       throw error;
@@ -280,29 +257,27 @@ class WhatsAppBot {
   async disconnect() {
     try {
       this.log('Desconectando bot...', 'info');
-      
+
       this.isConnectedFlag = false;
-      
+
       if (this.sock) {
-        // Fechar conexão
         await this.sock.logout();
         this.sock.ev.removeAllListeners();
         this.sock = null;
       }
-      
+
       this.io.emit('botStatus', { connected: false });
       this.io.emit('qrCode', null);
-      
+
       this.log('Bot desconectado', 'success');
       return true;
     } catch (error) {
       this.log('Erro ao desconectar: ' + error.message, 'error');
-      
-      // Forçar desconexão
+
       this.isConnectedFlag = false;
       this.sock = null;
       this.io.emit('botStatus', { connected: false });
-      
+
       return true;
     }
   }
@@ -316,7 +291,7 @@ class WhatsAppBot {
       if (!this.sock || !this.isConnectedFlag) {
         throw new Error('Bot não conectado');
       }
-      
+
       const groupMetadata = await this.sock.groupMetadata(groupId);
       return {
         id: groupId,
