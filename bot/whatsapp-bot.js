@@ -1,238 +1,348 @@
-const { 
-  default: makeWASocket, 
-  DisconnectReason, 
-  useMultiFileAuthState,
-  Browsers
-} = require('@whiskeysockets/baileys');
-const QRCode = require('qrcode');
-const axios = require('axios');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const fs = require('fs-extra');
+const axios = require('axios');
+const path = require('path');
 
 class WhatsAppBot {
-  constructor(io) {
+  constructor(io, logger) {
     this.io = io;
+    this.log = logger;
     this.sock = null;
-    this.connected = false;
-    this.qrCode = null;
+    this.isConnectedFlag = false;
+    this.groups = [];
+    this.retryCount = 0;
+    this.maxRetries = 3;
   }
 
   async initialize() {
     try {
+      this.log('Iniciando conexão com WhatsApp...', 'info');
+      
       // Configurar autenticação
       const { state, saveCreds } = await useMultiFileAuthState('./sessions');
       
-      // Criar socket WhatsApp
+      // Criar socket
       this.sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
-        browser: Browsers.ubuntu("Chrome"),
+        logger: {
+          level: 'silent',
+          child: () => ({ level: 'silent' })
+        },
+        browser: ['Auto Envios Bot', 'Chrome', '1.0.0'],
         defaultQueryTimeoutMs: 60000,
+        connectTimeoutMs: 60000,
+        keepAliveIntervalMs: 10000,
+        emitOwnEvents: true,
+        generateHighQualityLinkPreview: true
       });
 
-      // Eventos do socket
-      this.sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        
-        if (qr) {
-          // Gerar QR Code
-          try {
-            const qrCodeDataURL = await QRCode.toDataURL(qr);
-            this.qrCode = qrCodeDataURL;
-            this.io.emit('qrCode', qrCodeDataURL);
-            this.log('QR Code gerado', 'info');
-          } catch (error) {
-            this.log('Erro ao gerar QR Code: ' + error.message, 'error');
-          }
-        }
-        
-        if (connection === 'open') {
-          this.connected = true;
-          this.qrCode = null;
-          this.io.emit('botStatus', { connected: true });
-          this.io.emit('qrCode', null);
-          this.log('Bot conectado com sucesso!', 'success');
-          
-          // Enviar lista de grupos
-          const groups = await this.getGroups();
-          this.io.emit('groupsList', groups);
-        }
-        
-        if (connection === 'close') {
-          this.connected = false;
-          this.io.emit('botStatus', { connected: false });
-          
-          const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-          
-          if (shouldReconnect) {
-            this.log('Conexão perdida, tentando reconectar...', 'warning');
-            setTimeout(() => this.initialize(), 5000);
-          } else {
-            this.log('Bot desconectado', 'info');
-          }
-        }
-      });
-
-      // Salvar credenciais
+      // Event handlers
       this.sock.ev.on('creds.update', saveCreds);
+      this.sock.ev.on('connection.update', this.handleConnectionUpdate.bind(this));
+      this.sock.ev.on('messages.upsert', this.handleMessages.bind(this));
 
-      // Eventos de mensagens (opcional)
-      this.sock.ev.on('messages.upsert', async (m) => {
-        const message = m.messages[0];
-        if (!message.key.fromMe && m.type === 'notify') {
-          this.log(`Mensagem recebida de ${message.key.remoteJid}`, 'info');
-        }
-      });
-
+      return true;
     } catch (error) {
       this.log('Erro ao inicializar bot: ' + error.message, 'error');
       throw error;
     }
   }
 
-  async disconnect() {
-    try {
-      if (this.sock) {
-        await this.sock.logout();
-        this.sock = null;
+  handleConnectionUpdate(update) {
+    const { connection, lastDisconnect, qr } = update;
+    
+    if (qr) {
+      this.log('QR Code recebido', 'info');
+      // Converter QR para base64 e enviar para interface
+      const QRCode = require('qrcode');
+      QRCode.toDataURL(qr)
+        .then(qrDataUrl => {
+          this.io.emit('qrCode', qrDataUrl);
+        })
+        .catch(err => {
+          this.log('Erro ao gerar QR Code: ' + err.message, 'error');
+        });
+    }
+
+    if (connection === 'close') {
+      const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+      
+      this.log('Conexão fechada. Motivo: ' + lastDisconnect?.error?.output?.statusCode, 'warning');
+      
+      this.isConnectedFlag = false;
+      this.io.emit('botStatus', { connected: false });
+      this.io.emit('qrCode', null);
+      
+      if (shouldReconnect && this.retryCount < this.maxRetries) {
+        this.retryCount++;
+        this.log(`Tentando reconectar... (${this.retryCount}/${this.maxRetries})`, 'info');
+        setTimeout(() => this.initialize(), 5000);
+      } else if (this.retryCount >= this.maxRetries) {
+        this.log('Máximo de tentativas de reconexão atingido', 'error');
+        this.retryCount = 0;
       }
-      this.connected = false;
-      this.log('Bot desconectado', 'info');
-    } catch (error) {
-      this.log('Erro ao desconectar: ' + error.message, 'error');
+    } else if (connection === 'open') {
+      this.log('Conectado ao WhatsApp com sucesso!', 'success');
+      this.isConnectedFlag = true;
+      this.retryCount = 0;
+      this.io.emit('botStatus', { connected: true });
+      this.io.emit('qrCode', null);
+      
+      // Carregar grupos após conexão
+      setTimeout(() => this.loadGroups(), 2000);
     }
   }
 
-  isConnected() {
-    return this.connected;
+  handleMessages(m) {
+    // Processar mensagens recebidas se necessário
+    // Por enquanto apenas log básico
+    try {
+      const msg = m.messages[0];
+      if (msg?.key?.fromMe === false) {
+        this.log('Nova mensagem recebida', 'info');
+      }
+    } catch (error) {
+      // Ignorar erros de mensagens
+    }
+  }
+
+  async loadGroups() {
+    try {
+      if (!this.sock) return;
+      
+      this.log('Carregando grupos...', 'info');
+      
+      const groups = await this.sock.groupFetchAllParticipating();
+      
+      this.groups = Object.values(groups).map(group => ({
+        id: group.id,
+        name: group.subject || 'Grupo sem nome',
+        participants: group.participants ? group.participants.length : 0,
+        description: group.desc || '',
+        owner: group.owner || ''
+      }));
+      
+      this.log(`${this.groups.length} grupos carregados`, 'success');
+      
+      // Emitir grupos para interface
+      this.io.emit('groupsList', this.groups);
+      
+    } catch (error) {
+      this.log('Erro ao carregar grupos: ' + error.message, 'error');
+      this.groups = [];
+    }
   }
 
   async getGroups() {
-    if (!this.connected || !this.sock) return [];
-    
+    if (this.groups.length === 0) {
+      await this.loadGroups();
+    }
+    return this.groups;
+  }
+
+  async getLatestVideo(youtubeApiKey, channelId) {
     try {
-      const groups = await this.sock.groupFetchAllParticipating();
-      const groupList = Object.values(groups).map(group => ({
-        id: group.id,
-        name: group.subject,
-        participants: group.participants.length
-      }));
+      if (!youtubeApiKey || !channelId) {
+        throw new Error('API Key ou Channel ID não configurados');
+      }
+
+      this.log('Buscando último vídeo do canal...', 'info');
       
-      this.log(`${groupList.length} grupos encontrados`, 'info');
-      return groupList;
+      const response = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+        params: {
+          key: youtubeApiKey,
+          channelId: channelId,
+          part: 'snippet',
+          order: 'date',
+          maxResults: 1,
+          type: 'video'
+        },
+        timeout: 10000
+      });
+
+      if (response.data.items && response.data.items.length > 0) {
+        const video = response.data.items[0];
+        const videoData = {
+          id: video.id.videoId,
+          title: video.snippet.title,
+          description: video.snippet.description,
+          thumbnail: video.snippet.thumbnails.high?.url || video.snippet.thumbnails.default?.url,
+          publishedAt: video.snippet.publishedAt,
+          url: `https://www.youtube.com/watch?v=${video.id.videoId}`
+        };
+        
+        this.log(`Vídeo encontrado: ${videoData.title}`, 'success');
+        return videoData;
+      } else {
+        throw new Error('Nenhum vídeo encontrado no canal');
+      }
     } catch (error) {
-      this.log('Erro ao buscar grupos: ' + error.message, 'error');
-      return [];
+      this.log('Erro ao buscar vídeo: ' + error.message, 'error');
+      throw error;
     }
   }
 
-  async getLatestVideo() {
+  async sendLatestVideoToGroup(groupId) {
     try {
-      const config = await fs.readJSON('./config/settings.json');
-      const { youtubeApiKey, channelId } = config;
-      
-      const url = `https://www.googleapis.com/youtube/v3/search?key=${youtubeApiKey}&channelId=${channelId}&order=date&part=snippet&type=video&maxResults=1`;
-      
-      const response = await axios.get(url);
-      const data = response.data;
-      
-      if (!data.items || data.items.length === 0) {
-        throw new Error('Nenhum vídeo encontrado');
+      if (!this.sock || !this.isConnectedFlag) {
+        throw new Error('Bot não conectado');
       }
+
+      // Buscar configurações
+      const configPath = './config/settings.json';
+      let config = {};
       
-      const video = data.items[0];
-      const videoId = video.id.videoId;
-      const title = video.snippet.title;
-      const thumbnail = video.snippet.thumbnails.high.url;
-      const link = `https://www.youtube.com/watch?v=${videoId}`;
+      if (await fs.pathExists(configPath)) {
+        config = await fs.readJSON(configPath);
+      }
+
+      // Buscar último vídeo
+      const video = await this.getLatestVideo(config.youtubeApiKey, config.channelId);
       
-      return {
-        title,
-        link,
-        thumbnail,
-        videoId
-      };
+      // Preparar mensagem
+      const message = `🎥 *Novo vídeo no canal!*\n\n*${video.title}*\n\n${video.description.substring(0, 200)}${video.description.length > 200 ? '...' : ''}\n\n🔗 ${video.url}`;
+      
+      // Enviar mensagem
+      await this.sock.sendMessage(groupId, { 
+        text: message 
+      });
+      
+      this.log(`Vídeo enviado para grupo: ${groupId}`, 'success');
+      return true;
+      
     } catch (error) {
-      this.log('Erro ao buscar último vídeo: ' + error.message, 'error');
+      this.log(`Erro ao enviar vídeo para grupo ${groupId}: ${error.message}`, 'error');
       throw error;
     }
   }
 
   async sendLatestVideo(groupIds) {
-    if (!this.connected || !this.sock) {
-      throw new Error('Bot não conectado');
-    }
-    
     try {
-      const video = await this.getLatestVideo();
+      if (!this.sock || !this.isConnectedFlag) {
+        throw new Error('Bot não conectado');
+      }
+
+      if (!groupIds || groupIds.length === 0) {
+        throw new Error('Nenhum grupo selecionado');
+      }
+
+      this.log(`Iniciando envio para ${groupIds.length} grupos`, 'info');
+
+      // Buscar configurações
+      const configPath = './config/settings.json';
+      let config = {};
       
-      // Baixar thumbnail
-      const thumbnailResponse = await axios.get(video.thumbnail, { 
-        responseType: 'arraybuffer' 
-      });
-      const thumbnailBuffer = Buffer.from(thumbnailResponse.data);
+      if (await fs.pathExists(configPath)) {
+        config = await fs.readJSON(configPath);
+      }
+
+      // Buscar último vídeo
+      const video = await this.getLatestVideo(config.youtubeApiKey, config.channelId);
       
-      // Mensagem de texto
-      const message = `🚨 Saiu vídeo novo no canal!\n\n🎬 *${video.title}*\n👉 Assista agora: ${video.link}\n\n📢 Compartilhe com todos! 🙏`;
+      // Preparar mensagem
+      const message = `🎥 *Novo vídeo no canal!*\n\n*${video.title}*\n\n${video.description.substring(0, 200)}${video.description.length > 200 ? '...' : ''}\n\n🔗 ${video.url}`;
       
-      // Enviar para grupos selecionados
-      for (const groupId of groupIds) {
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Enviar para cada grupo com delay
+      for (let i = 0; i < groupIds.length; i++) {
         try {
-          // Enviar mensagem de texto
-          await this.sock.sendMessage(groupId, { text: message });
-          
-          // Aguardar um pouco
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Enviar imagem com legenda
-          await this.sock.sendMessage(groupId, {
-            image: thumbnailBuffer,
-            caption: `🆕 ${video.title}\n🎥 Assista: ${video.link}`
+          await this.sock.sendMessage(groupIds[i], { 
+            text: message 
           });
           
-          this.log(`Vídeo enviado para grupo: ${groupId}`, 'success');
+          successCount++;
+          this.log(`Enviado para grupo ${i + 1}/${groupIds.length}`, 'success');
           
-          // Aguardar entre envios
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Delay entre envios (exceto o último)
+          if (i < groupIds.length - 1) {
+            const delay = config.antiBanSettings?.delayBetweenGroups || 5;
+            await new Promise(resolve => setTimeout(resolve, delay * 1000));
+          }
+          
         } catch (error) {
-          this.log(`Erro ao enviar para grupo ${groupId}: ${error.message}`, 'error');
+          errorCount++;
+          this.log(`Erro ao enviar para grupo ${i + 1}: ${error.message}`, 'error');
         }
       }
       
-      this.log('Envio concluído!', 'success');
+      this.log(`Envio concluído: ${successCount} sucessos, ${errorCount} erros`, 'info');
+      return { successCount, errorCount };
+      
     } catch (error) {
-      this.log('Erro ao enviar vídeo: ' + error.message, 'error');
+      this.log('Erro no envio em lote: ' + error.message, 'error');
       throw error;
     }
   }
 
-  log(message, type = 'info') {
-    const timestamp = new Date().toISOString();
-    const logMessage = {
-      message,
-      type,
-      timestamp
-    };
-    
-    console.log(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
-    this.io.emit('log', logMessage);
-    
-    // Salvar log em arquivo
-    this.saveLog(logMessage);
-  }
-
-  async saveLog(logMessage) {
+  async disconnect() {
     try {
-      const logFile = `./logs/${new Date().toISOString().split('T')[0]}.json`;
-      let logs = [];
+      this.log('Desconectando bot...', 'info');
       
-      if (await fs.pathExists(logFile)) {
-        logs = await fs.readJSON(logFile);
+      this.isConnectedFlag = false;
+      
+      if (this.sock) {
+        // Fechar conexão
+        await this.sock.logout();
+        this.sock.ev.removeAllListeners();
+        this.sock = null;
       }
       
-      logs.push(logMessage);
-      await fs.writeJSON(logFile, logs, { spaces: 2 });
+      this.io.emit('botStatus', { connected: false });
+      this.io.emit('qrCode', null);
+      
+      this.log('Bot desconectado', 'success');
+      return true;
     } catch (error) {
-      console.error('Erro ao salvar log:', error);
+      this.log('Erro ao desconectar: ' + error.message, 'error');
+      
+      // Forçar desconexão
+      this.isConnectedFlag = false;
+      this.sock = null;
+      this.io.emit('botStatus', { connected: false });
+      
+      return true;
+    }
+  }
+
+  isConnected() {
+    return this.isConnectedFlag && this.sock;
+  }
+
+  async getGroupInfo(groupId) {
+    try {
+      if (!this.sock || !this.isConnectedFlag) {
+        throw new Error('Bot não conectado');
+      }
+      
+      const groupMetadata = await this.sock.groupMetadata(groupId);
+      return {
+        id: groupId,
+        name: groupMetadata.subject,
+        participants: groupMetadata.participants.length,
+        description: groupMetadata.desc || '',
+        owner: groupMetadata.owner
+      };
+    } catch (error) {
+      this.log(`Erro ao obter info do grupo ${groupId}: ${error.message}`, 'error');
+      return null;
+    }
+  }
+
+  async sendCustomMessage(groupId, message) {
+    try {
+      if (!this.sock || !this.isConnectedFlag) {
+        throw new Error('Bot não conectado');
+      }
+
+      await this.sock.sendMessage(groupId, { text: message });
+      this.log(`Mensagem personalizada enviada para: ${groupId}`, 'success');
+      return true;
+    } catch (error) {
+      this.log(`Erro ao enviar mensagem para ${groupId}: ${error.message}`, 'error');
+      throw error;
     }
   }
 }
