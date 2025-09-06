@@ -34,10 +34,15 @@ let activeTasks = new Map();
 
 // SISTEMA ANTI-DUPLICAÇÃO
 const sendingLocks = {
-  manual: new Set(), // IDs de grupos em envio manual
-  scheduled: new Map(), // Mapeia scheduleId -> status de envio
-  global: false // Flag global para evitar múltiplos envios simultâneos
+  manual: new Set(),
+  scheduled: new Map(),
+  global: false
 };
+
+// CONTROLE DE INICIALIZAÇÃO
+let isInitializing = false;
+let initializationAttempts = 0;
+const maxInitializationAttempts = 3;
 
 const defaultConfig = {
   youtubeApiKey: "",
@@ -53,7 +58,7 @@ const defaultConfig = {
   }
 };
 
-// Função de log
+// Função de log melhorada
 function log(message, type = 'info') {
   const timestamp = new Date().toISOString();
   const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
@@ -93,34 +98,101 @@ async function saveConfig(config) {
   }
 }
 
+// Função para limpeza completa (especial para erro 405)
+async function performCompleteCleanup() {
+  try {
+    log('Iniciando limpeza completa do sistema...', 'warning');
+    
+    // 1. Parar todos os agendamentos
+    activeTasks.forEach(task => { 
+      try { 
+        task.destroy(); 
+      } catch (e) {
+        log('Erro ao parar tarefa: ' + e.message, 'warning');
+      }
+    });
+    activeTasks.clear();
+    
+    // 2. Limpar locks
+    sendingLocks.global = false;
+    sendingLocks.manual.clear();
+    sendingLocks.scheduled.clear();
+    
+    // 3. Desconectar bot completamente
+    if (whatsappBot) {
+      try {
+        await whatsappBot.disconnect();
+      } catch (e) {
+        log('Erro ao desconectar bot (esperado): ' + e.message, 'warning');
+      }
+      whatsappBot = null;
+    }
+    
+    // 4. Aguardar um momento
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // 5. Limpar diretório de sessões se necessário
+    const sessionsPath = './sessions';
+    if (await fs.pathExists(sessionsPath)) {
+      const files = await fs.readdir(sessionsPath);
+      let corruptedFiles = 0;
+      
+      for (const file of files) {
+        const filePath = `${sessionsPath}/${file}`;
+        try {
+          if (file.endsWith('.json')) {
+            const content = await fs.readFile(filePath, 'utf8');
+            JSON.parse(content);
+          }
+        } catch (error) {
+          log(`Removendo arquivo corrompido: ${file}`, 'warning');
+          await fs.remove(filePath);
+          corruptedFiles++;
+        }
+      }
+      
+      if (corruptedFiles > 0) {
+        log(`${corruptedFiles} arquivos corrompidos removidos`, 'info');
+      }
+    }
+    
+    // 6. Resetar contadores
+    isInitializing = false;
+    initializationAttempts = 0;
+    
+    log('Limpeza completa concluída', 'success');
+    io.emit('botStatus', { connected: false });
+    io.emit('qrCode', null);
+    
+  } catch (error) {
+    log('Erro na limpeza completa: ' + error.message, 'error');
+  }
+}
+
 // Função para limpar locks expirados
 function cleanExpiredLocks() {
   const now = Date.now();
   
-  // Limpar locks de agendamentos (expiram em 10 minutos)
   for (const [scheduleId, lockInfo] of sendingLocks.scheduled) {
-    if (now - lockInfo.timestamp > 600000) { // 10 minutos
+    if (now - lockInfo.timestamp > 600000) {
       sendingLocks.scheduled.delete(scheduleId);
       log(`Lock expirado removido para agendamento: ${scheduleId}`, 'info');
     }
   }
 }
 
-// Executar limpeza a cada 5 minutos
 setInterval(cleanExpiredLocks, 300000);
 
-// Envio de vídeo com proteção anti-duplicação e anti-banimento
+// Envio com proteção anti-duplicação
 async function sendVideoWithAntiBot(groupIds, config, context = 'manual', scheduleId = null) {
   const lockKey = context === 'scheduled' ? scheduleId : 'manual';
   
-  // Verificar lock global
   if (sendingLocks.global) {
     const error = 'Outro envio já está em andamento. Aguarde a conclusão.';
     log(error, 'warning');
     throw new Error(error);
   }
 
-  // Verificar lock específico do contexto
   if (context === 'scheduled' && scheduleId) {
     if (sendingLocks.scheduled.has(scheduleId)) {
       const error = `Agendamento ${scheduleId} já está executando envio`;
@@ -129,12 +201,10 @@ async function sendVideoWithAntiBot(groupIds, config, context = 'manual', schedu
     }
   }
 
-  // Verificar se bot está conectado
   if (!whatsappBot || !whatsappBot.isConnected()) {
     throw new Error('Bot não conectado');
   }
 
-  // Filtrar grupos que já estão sendo processados
   const availableGroups = groupIds.filter(groupId => !sendingLocks.manual.has(groupId));
   
   if (availableGroups.length === 0) {
@@ -143,7 +213,6 @@ async function sendVideoWithAntiBot(groupIds, config, context = 'manual', schedu
     throw new Error(error);
   }
 
-  // Definir locks
   sendingLocks.global = true;
   
   if (context === 'scheduled' && scheduleId) {
@@ -153,15 +222,13 @@ async function sendVideoWithAntiBot(groupIds, config, context = 'manual', schedu
     });
   }
   
-  // Marcar grupos individuais como sendo processados
   availableGroups.forEach(groupId => sendingLocks.manual.add(groupId));
 
   try {
     const { antiBanSettings } = config;
     const totalGroups = availableGroups.length;
-    log(`Iniciando envio para ${totalGroups} grupos com proteção anti-banimento (contexto: ${context})`, 'info');
+    log(`Iniciando envio para ${totalGroups} grupos (contexto: ${context})`, 'info');
 
-    // Buscar vídeo apenas uma vez
     const video = await whatsappBot.getLatestVideo(config.youtubeApiKey, config.channelId);
     log(`Vídeo obtido: ${video.title}`, 'info');
 
@@ -169,7 +236,7 @@ async function sendVideoWithAntiBot(groupIds, config, context = 'manual', schedu
     for (let i = 0; i < availableGroups.length; i += antiBanSettings.maxGroupsPerBatch) {
       batches.push(availableGroups.slice(i, i + antiBanSettings.maxGroupsPerBatch));
     }
-    log(`Dividido em ${batches.length} lotes de até ${antiBanSettings.maxGroupsPerBatch} grupos`, 'info');
+    log(`Dividido em ${batches.length} lotes`, 'info');
 
     let sentCount = 0;
     const errors = [];
@@ -182,7 +249,6 @@ async function sendVideoWithAntiBot(groupIds, config, context = 'manual', schedu
         const groupId = batch[groupIndex];
         
         try {
-          // Verificar se ainda está conectado antes de cada envio
           if (!whatsappBot || !whatsappBot.isConnected()) {
             throw new Error('Bot desconectado durante o envio');
           }
@@ -206,19 +272,23 @@ async function sendVideoWithAntiBot(groupIds, config, context = 'manual', schedu
           
           log(`✅ Enviado para grupo ${sentCount}/${totalGroups} (${context})`, 'success');
 
-          // Delay entre grupos (exceto no último grupo do lote)
           if (groupIndex < batch.length - 1) {
-            log(`⏳ Aguardando ${antiBanSettings.delayBetweenGroups}s antes do próximo grupo...`, 'info');
+            log(`⏳ Aguardando ${antiBanSettings.delayBetweenGroups}s...`, 'info');
             await new Promise(resolve => setTimeout(resolve, antiBanSettings.delayBetweenGroups * 1000));
           }
 
         } catch (error) {
           errors.push({ groupId, error: error.message });
           log(`❌ Erro ao enviar para grupo: ${error.message}`, 'error');
+          
+          // Se for erro de conexão, interromper
+          if (error.message.includes('desconectado') || error.message.includes('405')) {
+            log('Erro de conexão detectado, interrompendo envio', 'error');
+            break;
+          }
         }
       }
 
-      // Delay entre lotes (exceto no último lote)
       if (batchIndex < batches.length - 1) {
         log(`⏳ Aguardando ${antiBanSettings.batchDelay}s antes do próximo lote...`, 'info');
         await new Promise(resolve => setTimeout(resolve, antiBanSettings.batchDelay * 1000));
@@ -236,24 +306,34 @@ async function sendVideoWithAntiBot(groupIds, config, context = 'manual', schedu
     };
 
   } finally {
-    // Sempre remover locks, independentemente de sucesso ou erro
     sendingLocks.global = false;
     
     if (context === 'scheduled' && scheduleId) {
       sendingLocks.scheduled.delete(scheduleId);
     }
     
-    // Remover locks individuais dos grupos
     availableGroups.forEach(groupId => sendingLocks.manual.delete(groupId));
-    
     log(`Locks removidos para contexto: ${context}`, 'info');
   }
 }
 
-// Inicializar bot
+// Inicializar bot com proteção contra erro 405
 async function initializeBot() {
+  if (isInitializing) {
+    log('Inicialização já em andamento', 'warning');
+    return false;
+  }
+
+  if (initializationAttempts >= maxInitializationAttempts) {
+    log('Máximo de tentativas de inicialização atingido', 'error');
+    return false;
+  }
+
+  isInitializing = true;
+  initializationAttempts++;
+
   try {
-    log('Inicializando WhatsApp Bot...', 'info');
+    log(`Inicializando WhatsApp Bot (tentativa ${initializationAttempts}/${maxInitializationAttempts})...`, 'info');
 
     if (whatsappBot) {
       try { 
@@ -264,21 +344,54 @@ async function initializeBot() {
       whatsappBot = null;
     }
 
+    // Aguardar um pouco entre tentativas
+    if (initializationAttempts > 1) {
+      const delay = Math.min(5000 * initializationAttempts, 15000);
+      log(`Aguardando ${delay/1000}s antes de tentar novamente...`, 'info');
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
     whatsappBot = new WhatsAppBot(io, log);
+    
+    // Configurar evento especial para erro 405
+    io.on('connection', (socket) => {
+      socket.on('error405', (data) => {
+        log('Evento erro 405 recebido da interface', 'error');
+        socket.emit('error405Response', data);
+      });
+    });
+
     await whatsappBot.initialize();
+    
     const config = await loadConfig();
     setupSchedules(config.schedules, config);
+    
     log('Bot inicializado com sucesso', 'success');
+    initializationAttempts = 0; // Reset contador em caso de sucesso
     return true;
+    
   } catch (error) {
     log('Erro ao inicializar bot: ' + error.message, 'error');
+    
+    // Se for erro 405, fazer limpeza especial
+    if (error.message.includes('405') || error.message.includes('Method Not Allowed')) {
+      log('Erro 405 detectado, realizando limpeza completa...', 'warning');
+      await performCompleteCleanup();
+      
+      // Emitir evento especial para interface
+      io.emit('error405Detected', { 
+        message: 'Erro 405 detectado. Sistema limpo. Tente "Limpar Sessão" se o problema persistir.' 
+      });
+    }
+    
     return false;
+  } finally {
+    isInitializing = false;
   }
 }
 
-// Configurar agendamentos com proteção anti-duplicação
+// Configurar agendamentos
 function setupSchedules(schedules, config) {
-  // Parar todas as tarefas ativas
   activeTasks.forEach(task => { 
     try { 
       task.destroy(); 
@@ -298,12 +411,11 @@ function setupSchedules(schedules, config) {
       const cronDays = schedule.days.join(',');
       const cronTime = `${schedule.minute} ${schedule.hour} * * ${cronDays}`;
 
-      log(`Configurando agendamento: ${schedule.name} - ${cronTime} - ${schedule.selectedGroups.length} grupos`, 'info');
+      log(`Configurando agendamento: ${schedule.name} - ${cronTime}`, 'info');
 
       const task = cron.schedule(cronTime, async () => {
-        // Verificar se o agendamento já está executando
         if (sendingLocks.scheduled.has(schedule.id)) {
-          log(`⚠️ Agendamento ${schedule.name} já está executando - ignorando`, 'warning');
+          log(`⚠️ Agendamento ${schedule.name} já está executando`, 'warning');
           return;
         }
 
@@ -318,10 +430,18 @@ function setupSchedules(schedules, config) {
               schedule.id
             );
             
-            log(`✅ Agendamento executado: ${schedule.name} - ${result.sentCount}/${result.totalGroups} enviados`, 'success');
+            log(`✅ Agendamento executado: ${schedule.name} - ${result.sentCount}/${result.totalGroups}`, 'success');
             
           } catch (error) {
             log(`❌ Erro no agendamento ${schedule.name}: ${error.message}`, 'error');
+            
+            // Se for erro 405 em agendamento, notificar
+            if (error.message.includes('405')) {
+              io.emit('scheduleError405', { 
+                scheduleName: schedule.name,
+                error: error.message 
+              });
+            }
           }
         } else {
           log(`⚠️ Bot desconectado - agendamento ${schedule.name} ignorado`, 'warning');
@@ -342,7 +462,7 @@ function setupSchedules(schedules, config) {
   log(`📅 ${activeTasks.size} agendamentos configurados`, 'info');
 }
 
-// Socket.IO eventos com debounce
+// Socket.IO eventos
 io.on('connection', (socket) => {
   log(`Cliente conectado: ${socket.id}`, 'info');
 
@@ -355,7 +475,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Debounce para eventos críticos
   const debouncedEvents = new Map();
 
   function debounceEvent(eventName, callback, delay = 2000) {
@@ -380,11 +499,9 @@ io.on('connection', (socket) => {
   socket.on('disconnectBot', debounceEvent('disconnectBot', async () => {
     log('Solicitação de desconexão do bot', 'info');
     
-    // Parar agendamentos
     activeTasks.forEach(task => { try { task.destroy(); } catch {} });
     activeTasks.clear();
     
-    // Limpar locks
     sendingLocks.global = false;
     sendingLocks.manual.clear();
     sendingLocks.scheduled.clear();
@@ -393,6 +510,10 @@ io.on('connection', (socket) => {
       await whatsappBot.disconnect(); 
       whatsappBot = null; 
     }
+    
+    // Reset contadores
+    isInitializing = false;
+    initializationAttempts = 0;
     
     socket.emit('disconnectResult', { success: true });
     io.emit('botStatus', { connected: false });
@@ -402,29 +523,26 @@ io.on('connection', (socket) => {
   socket.on('clearSession', debounceEvent('clearSession', async () => {
     log('Solicitação de limpeza de sessão', 'info');
     
-    // Parar tudo
-    activeTasks.forEach(task => { try { task.destroy(); } catch {} });
-    activeTasks.clear();
-    
-    // Limpar locks
-    sendingLocks.global = false;
-    sendingLocks.manual.clear();
-    sendingLocks.scheduled.clear();
-    
-    if (whatsappBot) { 
-      await whatsappBot.disconnect(); 
-      whatsappBot = null; 
-    }
+    await performCompleteCleanup();
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const sessionsPath = './sessions';
-    if (await fs.pathExists(sessionsPath)) await fs.remove(sessionsPath);
+    if (await fs.pathExists(sessionsPath)) {
+      await fs.remove(sessionsPath);
+    }
     await fs.ensureDir(sessionsPath);
 
     socket.emit('clearSessionResult', { success: true });
     io.emit('botStatus', { connected: false });
     log('Sessão limpa com sucesso', 'success');
+  }));
+
+  // Evento especial para forçar limpeza em caso de erro 405 persistente
+  socket.on('forceCleanup405', debounceEvent('forceCleanup405', async () => {
+    log('Limpeza forçada solicitada para erro 405', 'warning');
+    await performCompleteCleanup();
+    socket.emit('forceCleanup405Result', { success: true });
   }));
 
   socket.on('getGroups', async () => {
@@ -438,6 +556,14 @@ io.on('connection', (socket) => {
       catch (error) { 
         log('Erro ao obter grupos: ' + error.message, 'error'); 
         socket.emit('groupsList', []); 
+        
+        // Se for erro de conexão, pode ser 405
+        if (error.message.includes('405') || error.message.includes('não conectado')) {
+          socket.emit('connectionError', { 
+            type: 'groups_fetch_error',
+            message: error.message 
+          });
+        }
       }
     } else { 
       log('Bot não conectado para buscar grupos', 'warning'); 
@@ -471,31 +597,36 @@ io.on('connection', (socket) => {
       } catch (error) {
         log('❌ Erro no envio manual: ' + error.message, 'error');
         socket.emit('sendResult', { success: false, error: error.message });
+        
+        // Se for erro 405, emitir evento especial
+        if (error.message.includes('405')) {
+          socket.emit('sendError405', { error: error.message });
+        }
       }
     } else {
       const errorMsg = 'Bot não conectado';
       log('❌ ' + errorMsg, 'error');
       socket.emit('sendResult', { success: false, error: errorMsg });
     }
-  }, 3000)); // Debounce maior para envios
+  }, 3000));
 
   socket.on('getSendingStatus', () => {
     socket.emit('sendingStatus', {
       globalLock: sendingLocks.global,
       manualLocks: Array.from(sendingLocks.manual),
-      scheduledLocks: Array.from(sendingLocks.scheduled.keys())
+      scheduledLocks: Array.from(sendingLocks.scheduled.keys()),
+      botStatus: whatsappBot ? whatsappBot.getLockStatus() : null
     });
   });
 
   socket.on('disconnect', () => { 
     log(`Cliente desconectado: ${socket.id}`, 'info');
-    // Limpar debounce events deste socket
     debouncedEvents.forEach(timeout => clearTimeout(timeout));
     debouncedEvents.clear();
   });
 });
 
-// Rotas da API (mantidas iguais)
+// Rotas da API
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.post('/api/config', async (req, res) => {
@@ -531,29 +662,98 @@ app.get('/api/status', (req, res) => {
       globalLock: sendingLocks.global,
       manualLocks: sendingLocks.manual.size,
       scheduledLocks: sendingLocks.scheduled.size
+    },
+    systemStatus: {
+      isInitializing: isInitializing,
+      initializationAttempts: initializationAttempts,
+      maxAttempts: maxInitializationAttempts
     }
   });
 });
+
+// Nova rota para diagnóstico de erro 405
+app.get('/api/diagnostics/405', async (req, res) => {
+  try {
+    const sessionsPath = './sessions';
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      sessionsExists: await fs.pathExists(sessionsPath),
+      sessionFiles: [],
+      botStatus: whatsappBot ? whatsappBot.getLockStatus() : null,
+      systemLocks: {
+        global: sendingLocks.global,
+        manual: sendingLocks.manual.size,
+        scheduled: sendingLocks.scheduled.size
+      }
+    };
+
+    if (diagnostics.sessionsExists) {
+      try {
+        const files = await fs.readdir(sessionsPath);
+        for (const file of files) {
+          const filePath = `${sessionsPath}/${file}`;
+          const stats = await fs.stat(filePath);
+          diagnostics.sessionFiles.push({
+            name: file,
+            size: stats.size,
+            modified: stats.mtime,
+            isValid: file.endsWith('.json') ? await validateJsonFile(filePath) : true
+          });
+        }
+      } catch (error) {
+        diagnostics.sessionFilesError = error.message;
+      }
+    }
+
+    res.json(diagnostics);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Função auxiliar para validar arquivos JSON
+async function validateJsonFile(filePath) {
+  try {
+    const content = await fs.readFile(filePath, 'utf8');
+    JSON.parse(content);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Tratamento de erros globais
 process.on('uncaughtException', (error) => {
   log('Erro não capturado: ' + error.message, 'error');
   console.error(error.stack);
+  
+  // Se for erro 405, tentar recuperação
+  if (error.message.includes('405')) {
+    log('Erro 405 em exceção não capturada, iniciando recuperação...', 'error');
+    performCompleteCleanup().catch(e => 
+      log('Erro na recuperação: ' + e.message, 'error')
+    );
+  }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   log('Promise rejeitada: ' + reason, 'error');
   console.error('Promise rejeitada em:', promise, 'razão:', reason);
+  
+  // Se for erro 405, tentar recuperação
+  if (reason && reason.toString().includes('405')) {
+    log('Erro 405 em promise rejeitada, iniciando recuperação...', 'error');
+    performCompleteCleanup().catch(e => 
+      log('Erro na recuperação: ' + e.message, 'error')
+    );
+  }
 });
 
 // Encerramento gracioso
 process.on('SIGINT', async () => {
   log('Encerrando aplicação...', 'info');
   
-  // Parar agendamentos
   activeTasks.forEach(task => { try { task.destroy(); } catch {} });
-  
-  // Limpar locks
   sendingLocks.global = false;
   sendingLocks.manual.clear();
   sendingLocks.scheduled.clear();
@@ -590,6 +790,7 @@ async function startServer() {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📱 Acesse: http://localhost:${PORT}`);
       console.log(`⚡ Status: ONLINE`);
+      console.log(`🛠️ Diagnósticos: http://localhost:${PORT}/api/diagnostics/405`);
       console.log('========================================');
       log('Servidor iniciado com sucesso', 'success');
     });
