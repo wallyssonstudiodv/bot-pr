@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Disparador - Wallysson Studio Dv 2025</title>
+    <title>Auto Envios - Wallysson Studio Dv</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         * {
@@ -12,26 +12,11 @@
             box-sizing: border-box;
         }
 
-        :root {
-            --primary-color: #667eea;
-            --secondary-color: #764ba2;
-            --success-color: #27ae60;
-            --danger-color: #e74c3c;
-            --warning-color: #f39c12;
-            --info-color: #3498db;
-            --dark-color: #2c3e50;
-            --light-color: #ecf0f1;
-            --shadow: 0 10px 30px rgba(0,0,0,0.1);
-            --border-radius: 15px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            color: var(--dark-color);
-            line-height: 1.6;
+            color: #333;
         }
 
         .container {
@@ -44,168 +29,85 @@
             text-align: center;
             margin-bottom: 30px;
             background: white;
-            border-radius: var(--border-radius);
-            padding: 40px 30px;
-            box-shadow: var(--shadow);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--success-color));
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
 
         .header h1 {
-            color: var(--primary-color);
-            margin-bottom: 15px;
-            font-size: 3em;
-            font-weight: 700;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-            animation: fadeInUp 0.8s ease;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
         }
 
-        .header .subtitle {
-            font-size: 1.4em;
-            color: var(--secondary-color);
-            font-weight: 600;
-            margin: 10px 0;
-            animation: fadeInUp 0.8s ease 0.2s both;
-        }
-
-        .header .motto {
-            font-style: italic;
-            color: var(--info-color);
-            margin-top: 15px;
+        .header p {
+            color: #666;
             font-size: 1.1em;
-            animation: fadeInUp 0.8s ease 0.4s both;
+            margin: 10px 0;
         }
 
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .credit {
+            font-weight: bold;
+            color: #764ba2;
         }
 
         .card {
             background: white;
-            border-radius: var(--border-radius);
-            padding: 30px;
-            margin-bottom: 25px;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-            border: 1px solid rgba(0,0,0,0.05);
-            position: relative;
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
         }
 
         .card h2 {
-            color: var(--dark-color);
-            margin-bottom: 25px;
-            border-bottom: 3px solid var(--primary-color);
-            padding-bottom: 15px;
-            font-size: 1.4em;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
         }
 
         .status-indicator {
-            display: inline-flex;
-            align-items: center;
+            display: inline-block;
             padding: 8px 16px;
             border-radius: 25px;
             color: white;
-            font-weight: 600;
+            font-weight: bold;
             margin-left: 10px;
-            font-size: 0.9em;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
         }
 
         .status-connected {
-            background: var(--success-color);
-            box-shadow: 0 0 20px rgba(39, 174, 96, 0.3);
+            background: #27ae60;
         }
 
         .status-disconnected {
-            background: var(--danger-color);
-            box-shadow: 0 0 20px rgba(231, 76, 60, 0.3);
+            background: #e74c3c;
         }
 
         .btn {
-            background: var(--primary-color);
+            background: #667eea;
             color: white;
             border: none;
             padding: 12px 24px;
-            border-radius: 10px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
-            font-weight: 600;
             margin: 5px;
-            transition: var(--transition);
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .btn:hover::before {
-            left: 100%;
+            transition: all 0.3s;
         }
 
         .btn:hover {
-            background: var(--secondary-color);
+            background: #5a6fd8;
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-        }
-
-        .btn:active {
-            transform: translateY(0);
         }
 
         .btn:disabled {
-            background: #bdc3c7;
+            background: #ccc;
             cursor: not-allowed;
             transform: none;
-            box-shadow: none;
         }
 
         .btn-danger {
-            background: var(--danger-color);
+            background: #e74c3c;
         }
 
         .btn-danger:hover {
@@ -213,119 +115,67 @@
         }
 
         .btn-success {
-            background: var(--success-color);
+            background: #27ae60;
         }
 
         .btn-success:hover {
             background: #229954;
         }
 
-        .btn-warning {
-            background: var(--warning-color);
-        }
-
-        .btn-warning:hover {
-            background: #d68910;
-        }
-
         .btn-small {
-            padding: 8px 16px;
+            padding: 6px 12px;
             font-size: 14px;
-        }
-
-        .btn-large {
-            padding: 16px 32px;
-            font-size: 18px;
         }
 
         .qr-container {
             text-align: center;
-            padding: 30px;
-            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            border-radius: var(--border-radius);
-            margin-top: 20px;
+            padding: 20px;
         }
 
         .qr-code {
-            max-width: 280px;
-            border: 4px solid var(--primary-color);
-            border-radius: var(--border-radius);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            animation: qrPulse 2s ease-in-out infinite alternate;
-        }
-
-        @keyframes qrPulse {
-            from { transform: scale(1); }
-            to { transform: scale(1.02); }
+            max-width: 250px;
+            border: 3px solid #667eea;
+            border-radius: 15px;
         }
 
         .form-group {
-            margin-bottom: 25px;
-            position: relative;
+            margin-bottom: 20px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--dark-color);
-            font-size: 1.1em;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
         }
 
         .form-group input, .form-group select {
             width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
             font-size: 16px;
-            transition: var(--transition);
-            background: #fafafa;
         }
 
         .form-group input:focus, .form-group select:focus {
-            border-color: var(--primary-color);
+            border-color: #667eea;
             outline: none;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .groups-list {
-            max-height: 350px;
+            max-height: 300px;
             overflow-y: auto;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-            background: #fafafa;
-        }
-
-        .groups-list::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .groups-list::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-
-        .groups-list::-webkit-scrollbar-thumb {
-            background: var(--primary-color);
-            border-radius: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
         }
 
         .group-item {
             display: flex;
             align-items: center;
-            padding: 15px;
+            padding: 10px;
             border-bottom: 1px solid #eee;
-            transition: var(--transition);
-            border-radius: 8px;
-            margin-bottom: 5px;
-        }
-
-        .group-item:hover {
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         .group-item:last-child {
@@ -333,178 +183,103 @@
         }
 
         .group-item input[type="checkbox"] {
-            margin-right: 15px;
-            transform: scale(1.3);
-            cursor: pointer;
-        }
-
-        .group-item label {
-            cursor: pointer;
-            flex: 1;
-            font-weight: 500;
+            margin-right: 10px;
+            transform: scale(1.2);
         }
 
         .logs-container {
-            max-height: 450px;
+            max-height: 400px;
             overflow-y: auto;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 20px;
-            background: #2c3e50;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8f9fa;
             font-family: 'Courier New', monospace;
-            font-size: 14px;
-        }
-
-        .logs-container::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .logs-container::-webkit-scrollbar-track {
-            background: #34495e;
-            border-radius: 4px;
-        }
-
-        .logs-container::-webkit-scrollbar-thumb {
-            background: var(--primary-color);
-            border-radius: 4px;
         }
 
         .log-entry {
-            margin-bottom: 12px;
-            padding: 10px;
-            border-radius: 6px;
-            border-left: 4px solid;
-            animation: logSlideIn 0.3s ease;
-        }
-
-        @keyframes logSlideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
         }
 
         .log-info {
-            background: rgba(52, 152, 219, 0.1);
-            color: #3498db;
-            border-left-color: #3498db;
+            background: #d4edda;
+            color: #155724;
         }
 
         .log-success {
-            background: rgba(39, 174, 96, 0.1);
-            color: #27ae60;
-            border-left-color: #27ae60;
+            background: #d1ecf1;
+            color: #0c5460;
         }
 
         .log-warning {
-            background: rgba(243, 156, 18, 0.1);
-            color: #f39c12;
-            border-left-color: #f39c12;
+            background: #fff3cd;
+            color: #856404;
         }
 
         .log-error {
-            background: rgba(231, 76, 60, 0.1);
-            color: #e74c3c;
-            border-left-color: #e74c3c;
+            background: #f8d7da;
+            color: #721c24;
         }
 
         .schedule-item {
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            background: #fafafa;
-            transition: var(--transition);
-        }
-
-        .schedule-item:hover {
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
         }
 
         .schedule-item.active {
-            border-color: var(--success-color);
-            background: rgba(39, 174, 96, 0.05);
+            border-color: #27ae60;
+            background: #e8f5e8;
         }
 
         .schedule-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 15px;
+            margin-bottom: 10px;
         }
 
         .schedule-info {
             flex: 1;
-            min-width: 250px;
-        }
-
-        .schedule-info h3 {
-            color: var(--dark-color);
-            margin-bottom: 8px;
-            font-size: 1.2em;
-        }
-
-        .schedule-info small {
-            display: block;
-            color: #666;
-            margin-bottom: 4px;
         }
 
         .schedule-actions {
             display: flex;
-            gap: 8px;
+            gap: 5px;
             flex-wrap: wrap;
         }
 
         .days-selector {
             display: flex;
-            gap: 15px;
+            gap: 10px;
             flex-wrap: wrap;
-            margin: 15px 0;
+            margin: 10px 0;
         }
 
         .day-checkbox {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            background: #f8f9fa;
-            border: 2px solid #e0e0e0;
-            transition: var(--transition);
-            cursor: pointer;
-        }
-
-        .day-checkbox:hover {
-            background: white;
-            border-color: var(--primary-color);
-        }
-
-        .day-checkbox input:checked + label {
-            color: var(--primary-color);
-            font-weight: 600;
+            gap: 5px;
         }
 
         .hidden {
-            display: none !important;
+            display: none;
         }
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 25px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
         }
 
         .grid-3 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
         }
 
         .modal {
@@ -515,262 +290,53 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.6);
-            backdrop-filter: blur(5px);
-            animation: modalFadeIn 0.3s ease;
-        }
-
-        @keyframes modalFadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            background-color: rgba(0,0,0,0.5);
         }
 
         .modal-content {
-            background-color: white;
-            margin: 3% auto;
-            padding: 30px;
-            border-radius: var(--border-radius);
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 15px;
             width: 90%;
-            max-width: 700px;
-            max-height: 85vh;
+            max-width: 600px;
+            max-height: 80vh;
             overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: modalSlideIn 0.3s ease;
-        }
-
-        @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-50px) scale(0.9);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
         }
 
         .close {
             color: #aaa;
             float: right;
-            font-size: 32px;
+            font-size: 28px;
             font-weight: bold;
             cursor: pointer;
-            transition: var(--transition);
-            line-height: 1;
         }
 
         .close:hover {
-            color: var(--danger-color);
-            transform: rotate(90deg);
+            color: black;
         }
 
         .anti-ban-settings {
-            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
-            border: 2px solid #f39c12;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .anti-ban-settings::before {
-            content: '🛡️';
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            font-size: 60px;
-            opacity: 0.1;
-        }
-
-        .anti-ban-settings h3 {
-            color: var(--warning-color);
-            margin-bottom: 15px;
-            font-size: 1.3em;
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
         }
 
         .settings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-        }
-
-        .stats-card {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            text-align: center;
-            padding: 25px;
-            border-radius: 12px;
-            margin: 10px;
-            box-shadow: var(--shadow);
-        }
-
-        .stats-number {
-            font-size: 2.5em;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .stats-label {
-            font-size: 1em;
-            opacity: 0.9;
-        }
-
-        .connection-status {
-            display: flex;
-            align-items: center;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
-            padding: 20px;
-            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            border-radius: 12px;
-            margin: 20px 0;
         }
 
-        .status-icon {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            animation: statusPulse 2s infinite;
-        }
-
-        .status-icon.connected {
-            background: var(--success-color);
-            box-shadow: 0 0 20px rgba(39, 174, 96, 0.3);
-        }
-
-        .status-icon.disconnected {
-            background: var(--danger-color);
-            box-shadow: 0 0 20px rgba(231, 76, 60, 0.3);
-        }
-
-        @keyframes statusPulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        .tooltip {
-            position: relative;
-            cursor: help;
-        }
-
-        .tooltip::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--dark-color);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            white-space: nowrap;
-            opacity: 0;
-            visibility: hidden;
-            transition: var(--transition);
-            z-index: 1000;
-        }
-
-        .tooltip:hover::after {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--success-color);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: var(--shadow);
-            z-index: 2000;
-            animation: toastSlideIn 0.3s ease;
-        }
-
-        .toast.error {
-            background: var(--danger-color);
-        }
-
-        .toast.warning {
-            background: var(--warning-color);
-        }
-
-        .toast.info {
-            background: var(--info-color);
-        }
-
-        @keyframes toastSlideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 3000;
-        }
-
-        .loading-spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Responsividade Melhorada */
         @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-
             .header h1 {
-                font-size: 2.2em;
-            }
-
-            .header .subtitle {
-                font-size: 1.2em;
+                font-size: 2em;
             }
             
             .card {
-                padding: 20px;
+                padding: 15px;
             }
             
             .btn {
@@ -781,377 +347,133 @@
             .modal-content {
                 margin: 10% auto;
                 width: 95%;
-                padding: 20px;
             }
 
             .schedule-header {
                 flex-direction: column;
                 align-items: flex-start;
-            }
-
-            .schedule-actions {
-                width: 100%;
-                justify-content: flex-start;
-            }
-
-            .days-selector {
                 gap: 10px;
-            }
-
-            .day-checkbox {
-                padding: 6px 10px;
-            }
-
-            .grid {
-                grid-template-columns: 1fr;
-            }
-
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .header h1 {
-                font-size: 1.8em;
-            }
-
-            .btn {
-                padding: 8px 12px;
-                font-size: 12px;
-            }
-
-            .card {
-                padding: 15px;
-            }
-
-            .form-group input, .form-group select {
-                padding: 10px;
-            }
-        }
-
-        /* Animações de entrada */
-        .fade-in {
-            animation: fadeIn 0.6s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .slide-up {
-            animation: slideUp 0.6s ease;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header Melhorado -->
-        <div class="header fade-in">
-            <h1>🚀 Auto Disparador</h1>
-            <p class="subtitle">Sistema Avançado de Automação WhatsApp</p>
-            <p class="motto">✨ <em>"Você sonha, Deus realiza"</em> ✨</p>
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 Auto Envios</h1>
+            <p class="credit">Crédito para <strong>Wallysson Studio Dv 2025</strong></p>
+            <p>✨ <em>"Você sonha, Deus realiza"</em> ✨</p>
         </div>
 
-        <!-- Status e Conexão Melhorado -->
-        <div class="card slide-up">
-            <h2>🔗 Conexão WhatsApp</h2>
-            
-            <div class="connection-status">
-                <div id="statusIcon" class="status-icon disconnected"></div>
-                <div>
-                    <strong>Status: </strong>
-                    <span id="statusText">Desconectado</span>
-                </div>
+        <!-- Status e Conexão -->
+        <div class="card">
+            <h2>🔗 Conexão WhatsApp 
                 <span id="statusIndicator" class="status-indicator status-disconnected">Desconectado</span>
-            </div>
+            </h2>
             
             <div id="connectionButtons">
-                <button id="connectBtn" class="btn btn-large">
-                    <span>🔌</span> Conectar Bot
-                </button>
-                <button id="disconnectBtn" class="btn btn-danger btn-large" disabled>
-                    <span>🔌</span> Desconectar
-                </button>
-                <button id="clearSessionBtn" class="btn btn-warning">
-                    <span>🗑️</span> Limpar Sessão
-                </button>
+                <button id="connectBtn" class="btn">Conectar Bot</button>
+                <button id="disconnectBtn" class="btn btn-danger" disabled>Desconectar</button>
+                <button id="clearSessionBtn" class="btn btn-danger">Limpar Sessão</button>
             </div>
 
-            <!-- QR Code Melhorado -->
+            <!-- QR Code -->
             <div id="qrContainer" class="qr-container hidden">
-                <h3 style="color: var(--primary-color); margin-bottom: 15px;">
-                    📱 Escaneie o QR Code com seu WhatsApp
-                </h3>
+                <p>📱 Escaneie o QR Code com seu WhatsApp:</p>
                 <img id="qrCode" class="qr-code" alt="QR Code">
-                <p style="margin-top: 15px; color: #666;">
-                    Abra o WhatsApp → Menu → Aparelhos conectados → Conectar um aparelho
-                </p>
             </div>
         </div>
 
         <div class="grid">
-            <!-- Configurações do YouTube Melhoradas -->
-            <div class="card slide-up">
+            <!-- Configurações do YouTube -->
+            <div class="card">
                 <h2>🎥 Configurações YouTube</h2>
                 <div class="form-group">
-                    <label class="tooltip" data-tooltip="Sua chave da API do YouTube v3">
-                        API Key do YouTube:
-                    </label>
-                    <input type="password" id="youtubeApiKey" placeholder="Digite sua API Key">
+                    <label>API Key do YouTube:</label>
+                    <input type="text" id="youtubeApiKey" placeholder="Sua API Key">
                 </div>
                 <div class="form-group">
-                    <label class="tooltip" data-tooltip="ID do canal do YouTube (encontrado na URL)">
-                        ID do Canal:
-                    </label>
-                    <input type="text" id="channelId" placeholder="Digite o ID do canal">
+                    <label>ID do Canal:</label>
+                    <input type="text" id="channelId" placeholder="ID do canal">
                 </div>
-                <button id="saveConfigBtn" class="btn btn-success btn-large">
-                    <span>💾</span> Salvar Configurações
-                </button>
-                <button id="testConnectionBtn" class="btn">
-                    <span>🔗</span> Testar Conexão
-                </button>
+                <button id="saveConfigBtn" class="btn">Salvar Configurações</button>
             </div>
 
-            <!-- Configurações Anti-Banimento Melhoradas -->
-            <div class="card slide-up">
+            <!-- Configurações Anti-Banimento -->
+            <div class="card">
                 <h2>🛡️ Proteção Anti-Banimento</h2>
                 <div class="anti-ban-settings">
-                    <h3>⚠️ Configurações de Segurança Avançadas</h3>
-                    <p style="margin-bottom: 20px; color: #666;">
-                        Configure os delays para evitar bloqueios do WhatsApp
-                    </p>
+                    <h3>⚠️ Configurações de Segurança</h3>
                     <div class="settings-grid">
                         <div class="form-group">
-                            <label class="tooltip" data-tooltip="Tempo de espera entre grupos">
-                                Delay entre grupos (seg):
-                            </label>
-                            <input type="range" id="delayBetweenGroups" value="5" min="1" max="60" 
-                                   oninput="document.getElementById('delayGroupsValue').textContent = this.value">
-                            <div>Valor: <span id="delayGroupsValue">5</span>s</div>
+                            <label>Delay entre grupos (segundos):</label>
+                            <input type="number" id="delayBetweenGroups" value="5" min="1" max="60">
                         </div>
                         <div class="form-group">
-                            <label class="tooltip" data-tooltip="Tempo de espera entre mensagens">
-                                Delay entre mensagens (seg):
-                            </label>
-                            <input type="range" id="delayBetweenMessages" value="2" min="1" max="30"
-                                   oninput="document.getElementById('delayMessagesValue').textContent = this.value">
-                            <div>Valor: <span id="delayMessagesValue">2</span>s</div>
+                            <label>Delay entre mensagens (segundos):</label>
+                            <input type="number" id="delayBetweenMessages" value="2" min="1" max="30">
                         </div>
                         <div class="form-group">
-                            <label class="tooltip" data-tooltip="Máximo de grupos por lote">
-                                Max grupos por lote:
-                            </label>
+                            <label>Max grupos por lote:</label>
                             <input type="number" id="maxGroupsPerBatch" value="10" min="1" max="50">
                         </div>
                         <div class="form-group">
-                            <label class="tooltip" data-tooltip="Pausa entre lotes de grupos">
-                                Delay entre lotes (seg):
-                            </label>
+                            <label>Delay entre lotes (segundos):</label>
                             <input type="number" id="batchDelay" value="30" min="10" max="300">
                         </div>
                     </div>
-                    <button id="saveAntibanBtn" class="btn btn-warning btn-large">
-                        <span>🛡️</span> Salvar Proteções
-                    </button>
+                    <button id="saveAntibanBtn" class="btn">Salvar Proteções</button>
                 </div>
             </div>
         </div>
 
-        <!-- Estatísticas -->
-        <div class="grid-3">
-            <div class="stats-card">
-                <div class="stats-number" id="totalGroups">0</div>
-                <div class="stats-label">Grupos Conectados</div>
-            </div>
-            <div class="stats-card">
-                <div class="stats-number" id="totalSchedules">0</div>
-                <div class="stats-label">Agendamentos Ativos</div>
-            </div>
-            <div class="stats-card">
-                <div class="stats-number" id="totalSent">0</div>
-                <div class="stats-label">Vídeos Enviados</div>
-            </div>
-        </div>
-
-        <!-- Grupos WhatsApp Melhorado -->
-        <div class="card slide-up">
+        <!-- Grupos WhatsApp -->
+        <div class="card">
             <h2>👥 Grupos WhatsApp</h2>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button id="refreshGroupsBtn" class="btn">
-                    <span>🔄</span> Atualizar Grupos
-                </button>
-                <button id="sendNowBtn" class="btn btn-success btn-large">
-                    <span>🚀</span> Enviar Agora
-                </button>
-                <button id="selectAllBtn" class="btn">
-                    <span>✅</span> Selecionar Todos
-                </button>
-                <button id="deselectAllBtn" class="btn">
-                    <span>❌</span> Desmarcar Todos
-                </button>
-            </div>
-
-            <div class="progress-bar">
-                <div id="sendProgress" class="progress-fill"></div>
-            </div>
-            
+            <button id="refreshGroupsBtn" class="btn">Atualizar Grupos</button>
+            <button id="sendNowBtn" class="btn btn-success">Enviar Agora</button>
             <div id="groupsList" class="groups-list">
                 <p>Conecte o bot para ver os grupos...</p>
             </div>
         </div>
 
-        <!-- Agendamentos Melhorados -->
-        <div class="card slide-up">
+        <!-- Agendamentos -->
+        <div class="card">
             <h2>⏰ Agendamentos Automáticos</h2>
             
-            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button id="addScheduleModalBtn" class="btn btn-success btn-large">
-                    <span>➕</span> Novo Agendamento
-                </button>
-                <button id="importScheduleBtn" class="btn">
-                    <span>📥</span> Importar
-                </button>
-                <button id="exportScheduleBtn" class="btn">
-                    <span>📤</span> Exportar
-                </button>
-            </div>
+            <button id="addScheduleModalBtn" class="btn btn-success">➕ Novo Agendamento</button>
             
             <div id="schedulesList">
-                <div style="text-align: center; padding: 40px; color: #666;">
-                    <span style="font-size: 3em;">📅</span>
-                    <p>Nenhum agendamento configurado ainda</p>
-                    <p><small>Clique em "Novo Agendamento" para começar</small></p>
-                </div>
+                <!-- Agendamentos serão adicionados aqui -->
             </div>
         </div>
 
-        <!-- Logs Melhorados -->
-        <div class="card slide-up">
+        <!-- Logs -->
+        <div class="card">
             <h2>📊 Logs em Tempo Real</h2>
-            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button id="clearLogsBtn" class="btn btn-warning">
-                    <span>🗑️</span> Limpar Logs
-                </button>
-                <button id="exportLogsBtn" class="btn">
-                    <span>💾</span> Exportar Logs
-                </button>
-                <button id="pauseLogsBtn" class="btn">
-                    <span>⏸️</span> Pausar
-                </button>
-            </div>
+            <button id="clearLogsBtn" class="btn">Limpar Logs</button>
             <div id="logsContainer" class="logs-container">
-                <div class="log-entry log-info">
-                    <strong>[Sistema]</strong> Auto Disparador iniciado com sucesso! 🚀
-                </div>
+                <div class="log-entry log-info">Sistema iniciado...</div>
             </div>
         </div>
     </div>
 
-    <!-- Footer com Créditos -->
-    <footer style="background: var(--dark-color); color: white; padding: 40px 20px; margin-top: 50px;">
-        <div style="max-width: 1400px; margin: 0 auto; text-align: center;">
-            <div style="margin-bottom: 30px;">
-                <h3 style="color: var(--primary-color); margin-bottom: 15px; font-size: 1.5em;">
-                    🚀 Auto Disparador
-                </h3>
-                <p style="margin-bottom: 10px; font-size: 1.1em;">
-                    Sistema Avançado de Automação para WhatsApp
-                </p>
-                <p style="opacity: 0.8;">
-                    ✨ <em>"Você sonha, Deus realiza"</em> ✨
-                </p>
-            </div>
-
-            <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 30px; margin-bottom: 20px;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; text-align: left;">
-                    <div>
-                        <h4 style="color: var(--success-color); margin-bottom: 15px;">
-                            👨‍💻 Desenvolvedor
-                        </h4>
-                        <p style="margin: 8px 0;"><strong>Wallysson Studio Dv</strong></p>
-                        <p style="margin: 8px 0; opacity: 0.8;">Especialista em Automação</p>
-                        <p style="margin: 8px 0; opacity: 0.8;">© 2025 - Todos os direitos reservados</p>
-                    </div>
-                    
-                    <div>
-                        <h4 style="color: var(--info-color); margin-bottom: 15px;">
-                            📞 Contatos
-                        </h4>
-                        <p style="margin: 8px 0;">📧 wallyssonstudio@gmail.com</p>
-                        <p style="margin: 8px 0;">🌐 wallyssonstudio.dev</p>
-                        <p style="margin: 8px 0;">📱 WhatsApp: (85) 9999-9999</p>
-                    </div>
-                    
-                    <div>
-                        <h4 style="color: var(--warning-color); margin-bottom: 15px;">
-                            🎯 Recursos
-                        </h4>
-                        <p style="margin: 8px 0;">⚡ Automação Completa</p>
-                        <p style="margin: 8px 0;">🛡️ Sistema Anti-Ban</p>
-                        <p style="margin: 8px 0;">📊 Logs em Tempo Real</p>
-                        <p style="margin: 8px 0;">⏰ Agendamentos Inteligentes</p>
-                    </div>
-                </div>
-            </div>
-
-            <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-                <p style="margin: 0; opacity: 0.6; font-size: 0.9em;">
-                    Desenvolvido com 💜 por <strong style="color: var(--primary-color);">Wallysson Studio Dv</strong> - 
-                    Transformando ideias em soluções digitais desde 2025
-                </p>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Modal para Novo Agendamento Melhorado -->
+    <!-- Modal para Novo Agendamento -->
     <div id="scheduleModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2>📅 Configurar Agendamento</h2>
+            <h2>📅 Novo Agendamento</h2>
             
             <div class="form-group">
                 <label>Nome do Agendamento:</label>
-                <input type="text" id="scheduleName" placeholder="Ex: Envio Matinal" maxlength="50">
-            </div>
-            
-            <div class="form-group">
-                <label>Descrição (opcional):</label>
-                <input type="text" id="scheduleDescription" placeholder="Descreva este agendamento" maxlength="100">
+                <input type="text" id="scheduleName" placeholder="Ex: Envio Manhã">
             </div>
             
             <div class="grid-3">
                 <div class="form-group">
                     <label>Hora:</label>
                     <input type="time" id="scheduleTime">
-                </div>
-                <div class="form-group">
-                    <label>Fuso Horário:</label>
-                    <select id="scheduleTimezone">
-                        <option value="America/Sao_Paulo">Brasília (UTC-3)</option>
-                        <option value="America/New_York">New York (UTC-5)</option>
-                        <option value="Europe/London">Londres (UTC+0)</option>
-                        <option value="Asia/Tokyo">Tóquio (UTC+9)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Repetir por (dias):</label>
-                    <input type="number" id="scheduleRepeatDays" value="0" min="0" max="365" 
-                           placeholder="0 = infinito">
                 </div>
             </div>
             
@@ -1160,182 +482,91 @@
                 <div class="days-selector">
                     <div class="day-checkbox">
                         <input type="checkbox" id="modalDay0" value="0">
-                        <label for="modalDay0">Domingo</label>
+                        <label for="modalDay0">Dom</label>
                     </div>
                     <div class="day-checkbox">
                         <input type="checkbox" id="modalDay1" value="1">
-                        <label for="modalDay1">Segunda</label>
+                        <label for="modalDay1">Seg</label>
                     </div>
                     <div class="day-checkbox">
                         <input type="checkbox" id="modalDay2" value="2">
-                        <label for="modalDay2">Terça</label>
+                        <label for="modalDay2">Ter</label>
                     </div>
                     <div class="day-checkbox">
                         <input type="checkbox" id="modalDay3" value="3">
-                        <label for="modalDay3">Quarta</label>
+                        <label for="modalDay3">Qua</label>
                     </div>
                     <div class="day-checkbox">
                         <input type="checkbox" id="modalDay4" value="4">
-                        <label for="modalDay4">Quinta</label>
+                        <label for="modalDay4">Qui</label>
                     </div>
                     <div class="day-checkbox">
                         <input type="checkbox" id="modalDay5" value="5">
-                        <label for="modalDay5">Sexta</label>
+                        <label for="modalDay5">Sex</label>
                     </div>
                     <div class="day-checkbox">
                         <input type="checkbox" id="modalDay6" value="6">
-                        <label for="modalDay6">Sábado</label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>Filtros Avançados:</label>
-                <div class="grid-3">
-                    <div>
-                        <label><input type="checkbox" id="onlyActiveGroups"> Apenas grupos ativos</label>
-                    </div>
-                    <div>
-                        <label><input type="checkbox" id="minParticipants"> Min. participantes:</label>
-                        <input type="number" id="minParticipantsCount" value="10" min="1" max="1000">
-                    </div>
-                    <div>
-                        <label><input type="checkbox" id="excludeKeywords"> Excluir palavras-chave:</label>
-                        <input type="text" id="excludeKeywordsList" placeholder="palavra1, palavra2">
+                        <label for="modalDay6">Sab</label>
                     </div>
                 </div>
             </div>
 
             <div class="form-group">
                 <label>Selecionar Grupos para este Agendamento:</label>
-                <div style="margin-bottom: 10px;">
-                    <button type="button" class="btn btn-small" onclick="selectAllModalGroups()">
-                        ✅ Todos
-                    </button>
-                    <button type="button" class="btn btn-small" onclick="deselectAllModalGroups()">
-                        ❌ Nenhum
-                    </button>
-                    <button type="button" class="btn btn-small" onclick="selectLargeGroups()">
-                        👥 Grupos Grandes
-                    </button>
-                </div>
                 <div id="modalGroupsList" class="groups-list">
                     <p>Carregue os grupos primeiro...</p>
                 </div>
             </div>
 
-            <div style="text-align: center; margin-top: 30px;">
-                <button id="saveScheduleBtn" class="btn btn-success btn-large">
-                    <span>💾</span> Salvar Agendamento
-                </button>
-                <button id="cancelScheduleBtn" class="btn btn-danger">
-                    <span>❌</span> Cancelar
-                </button>
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="saveScheduleBtn" class="btn btn-success">Salvar Agendamento</button>
+                <button id="cancelScheduleBtn" class="btn btn-danger">Cancelar</button>
             </div>
         </div>
-    </div>
-
-    <!-- Modal de Confirmação -->
-    <div id="confirmModal" class="modal">
-        <div class="modal-content" style="max-width: 400px; text-align: center;">
-            <h3 id="confirmTitle">Confirmar Ação</h3>
-            <p id="confirmMessage">Tem certeza que deseja continuar?</p>
-            <div style="margin-top: 20px;">
-                <button id="confirmYes" class="btn btn-success">Sim</button>
-                <button id="confirmNo" class="btn btn-danger">Não</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast para Notificações -->
-    <div id="toast" class="toast hidden">
-        <span id="toastMessage"></span>
     </div>
 
     <script>
-        // Variáveis globais melhoradas
         const socket = io();
         let currentConfig = {};
         let currentGroups = [];
         let editingScheduleId = null;
-        let logsPaused = false;
-        let totalSentMessages = 0;
 
         // Elementos DOM
         const statusIndicator = document.getElementById('statusIndicator');
-        const statusIcon = document.getElementById('statusIcon');
-        const statusText = document.getElementById('statusText');
         const connectBtn = document.getElementById('connectBtn');
         const disconnectBtn = document.getElementById('disconnectBtn');
         const clearSessionBtn = document.getElementById('clearSessionBtn');
         const qrContainer = document.getElementById('qrContainer');
         const qrCode = document.getElementById('qrCode');
-        
-        // Configurações
         const youtubeApiKey = document.getElementById('youtubeApiKey');
         const channelId = document.getElementById('channelId');
         const saveConfigBtn = document.getElementById('saveConfigBtn');
-        const testConnectionBtn = document.getElementById('testConnectionBtn');
         const saveAntibanBtn = document.getElementById('saveAntibanBtn');
-        
-        // Grupos
         const refreshGroupsBtn = document.getElementById('refreshGroupsBtn');
         const sendNowBtn = document.getElementById('sendNowBtn');
-        const selectAllBtn = document.getElementById('selectAllBtn');
-        const deselectAllBtn = document.getElementById('deselectAllBtn');
         const groupsList = document.getElementById('groupsList');
-        const sendProgress = document.getElementById('sendProgress');
-        
-        // Logs
         const logsContainer = document.getElementById('logsContainer');
         const clearLogsBtn = document.getElementById('clearLogsBtn');
-        const exportLogsBtn = document.getElementById('exportLogsBtn');
-        const pauseLogsBtn = document.getElementById('pauseLogsBtn');
-        
-        // Agendamentos
         const addScheduleModalBtn = document.getElementById('addScheduleModalBtn');
-        const importScheduleBtn = document.getElementById('importScheduleBtn');
-        const exportScheduleBtn = document.getElementById('exportScheduleBtn');
         const schedulesList = document.getElementById('schedulesList');
         const scheduleModal = document.getElementById('scheduleModal');
         const modalGroupsList = document.getElementById('modalGroupsList');
-        
-        // Estatísticas
-        const totalGroups = document.getElementById('totalGroups');
-        const totalSchedules = document.getElementById('totalSchedules');
-        const totalSent = document.getElementById('totalSent');
-        
-        // Modal de confirmação
-        const confirmModal = document.getElementById('confirmModal');
-        const toast = document.getElementById('toast');
 
-        // Socket events melhorados
+        // Socket events
         socket.on('connect', () => {
-            showToast('Conectado ao servidor com sucesso!', 'success');
-            addLog('🔗 Conectado ao servidor', 'success');
+            addLog('Conectado ao servidor', 'success');
             loadConfig();
-            updateConnectionStatus(false);
-        });
-
-        socket.on('disconnect', () => {
-            showToast('Desconectado do servidor', 'error');
-            addLog('❌ Desconectado do servidor', 'error');
-            updateConnectionStatus(false);
         });
 
         socket.on('botStatus', (data) => {
-            updateConnectionStatus(data.connected);
-            if (data.connected) {
-                showToast('Bot conectado ao WhatsApp!', 'success');
-            }
+            updateStatus(data.connected);
         });
 
         socket.on('qrCode', (qrDataUrl) => {
             if (qrDataUrl) {
                 qrCode.src = qrDataUrl;
                 qrContainer.classList.remove('hidden');
-                addLog('📱 QR Code gerado - escaneie com seu WhatsApp', 'info');
-                showToast('QR Code gerado! Escaneie com seu WhatsApp', 'info');
+                addLog('QR Code gerado - escaneie com seu WhatsApp', 'info');
             } else {
                 qrContainer.classList.add('hidden');
             }
@@ -1345,119 +576,86 @@
             currentGroups = groups;
             renderGroups(groups);
             renderModalGroups(groups);
-            updateStats();
-            addLog(`📱 ${groups.length} grupos carregados`, 'success');
         });
 
         socket.on('log', (logData) => {
-            if (!logsPaused) {
-                addLog(logData.message, logData.type);
-            }
+            addLog(logData.message, logData.type);
         });
 
         socket.on('initResult', (result) => {
             if (result.success) {
-                addLog('🤖 Bot inicializado com sucesso', 'success');
-                showToast('Bot inicializado!', 'success');
+                addLog('Bot inicializado com sucesso', 'success');
             } else {
-                addLog('❌ Erro ao inicializar bot: ' + result.error, 'error');
-                showToast('Erro ao inicializar bot', 'error');
+                addLog('Erro ao inicializar bot', 'error');
             }
         });
 
         socket.on('disconnectResult', (result) => {
             if (result.success) {
-                addLog('🔌 Bot desconectado com sucesso', 'success');
-                updateConnectionStatus(false);
-                showToast('Bot desconectado!', 'info');
+                addLog('Bot desconectado com sucesso', 'success');
+                updateStatus(false);
             } else {
-                addLog('❌ Erro ao desconectar: ' + result.error, 'error');
-                showToast('Erro ao desconectar', 'error');
+                addLog('Erro ao desconectar: ' + result.error, 'error');
             }
         });
 
         socket.on('clearSessionResult', (result) => {
             if (result.success) {
-                addLog('🗑️ Sessão limpa com sucesso', 'success');
-                updateConnectionStatus(false);
-                showToast('Sessão limpa!', 'success');
+                addLog('Sessão limpa com sucesso', 'success');
+                updateStatus(false);
             } else {
-                addLog('❌ Erro ao limpar sessão: ' + result.error, 'error');
-                showToast('Erro ao limpar sessão', 'error');
+                addLog('Erro ao limpar sessão: ' + result.error, 'error');
             }
         });
 
         socket.on('sendResult', (result) => {
             if (result.success) {
-                totalSentMessages++;
-                updateStats();
-                addLog('✅ Vídeo enviado com sucesso!', 'success');
-                showToast('Vídeo enviado!', 'success');
+                addLog('Vídeo enviado com sucesso!', 'success');
             } else {
-                addLog('❌ Erro ao enviar vídeo: ' + result.error, 'error');
-                showToast('Erro ao enviar vídeo', 'error');
+                addLog('Erro ao enviar vídeo: ' + result.error, 'error');
             }
         });
 
-        socket.on('sendProgress', (progress) => {
-            updateSendProgress(progress);
-        });
-
-        // Event listeners melhorados
+        // Event listeners
         connectBtn.addEventListener('click', () => {
-            showLoading('Conectando bot...');
             socket.emit('initBot');
-            addLog('🔄 Iniciando bot...', 'info');
+            addLog('Iniciando bot...', 'info');
         });
 
         disconnectBtn.addEventListener('click', () => {
-            confirmAction('Desconectar Bot', 'Tem certeza que deseja desconectar o bot?', () => {
-                socket.emit('disconnectBot');
-                addLog('🔄 Desconectando bot...', 'info');
-            });
+            socket.emit('disconnectBot');
+            addLog('Desconectando bot...', 'info');
         });
 
         clearSessionBtn.addEventListener('click', () => {
-            confirmAction('Limpar Sessão', 'Tem certeza que deseja limpar a sessão? Você precisará escanear o QR code novamente.', () => {
+            if (confirm('Tem certeza que deseja limpar a sessão? Você precisará escanear o QR code novamente.')) {
                 socket.emit('clearSession');
-                addLog('🔄 Limpando sessão...', 'info');
-            });
+                addLog('Limpando sessão...', 'info');
+            }
         });
 
-        saveConfigBtn.addEventListener('click', saveConfig);
-        testConnectionBtn.addEventListener('click', testYouTubeConnection);
-        saveAntibanBtn.addEventListener('click', saveAntiBanSettings);
+        saveConfigBtn.addEventListener('click', () => {
+            saveConfig();
+        });
+
+        saveAntibanBtn.addEventListener('click', () => {
+            saveAntiBanSettings();
+        });
 
         refreshGroupsBtn.addEventListener('click', () => {
             socket.emit('getGroups');
-            addLog('🔄 Atualizando lista de grupos...', 'info');
-            showToast('Atualizando grupos...', 'info');
+            addLog('Atualizando lista de grupos...', 'info');
         });
 
         sendNowBtn.addEventListener('click', () => {
             const selectedGroups = getSelectedGroups();
             if (selectedGroups.length === 0) {
-                showToast('Selecione pelo menos um grupo', 'warning');
+                addLog('Selecione pelo menos um grupo', 'warning');
                 return;
             }
             
-            confirmAction('Enviar Agora', `Enviar vídeo para ${selectedGroups.length} grupos?`, () => {
-                socket.emit('sendVideoNow', selectedGroups);
-                addLog(`🚀 Enviando vídeo para ${selectedGroups.length} grupos...`, 'info');
-                showToast('Iniciando envio...', 'info');
-            });
-        });
-
-        selectAllBtn.addEventListener('click', () => {
-            const checkboxes = groupsList.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => cb.checked = true);
-            showToast(`${checkboxes.length} grupos selecionados`, 'info');
-        });
-
-        deselectAllBtn.addEventListener('click', () => {
-            const checkboxes = groupsList.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => cb.checked = false);
-            showToast('Todos os grupos desmarcados', 'info');
+            socket.emit('sendVideoNow', selectedGroups);
+            addLog(`Enviando vídeo para ${selectedGroups.length} grupos...`, 'info');
         });
 
         addScheduleModalBtn.addEventListener('click', () => {
@@ -1467,83 +665,46 @@
             scheduleModal.style.display = 'block';
         });
 
-        importScheduleBtn.addEventListener('click', importSchedules);
-        exportScheduleBtn.addEventListener('click', exportSchedules);
-
-        clearLogsBtn.addEventListener('click', () => {
-            confirmAction('Limpar Logs', 'Tem certeza que deseja limpar todos os logs?', () => {
-                logsContainer.innerHTML = '<div class="log-entry log-info"><strong>[Sistema]</strong> Logs limpos pelo usuário 🗑️</div>';
-                showToast('Logs limpos!', 'info');
-            });
-        });
-
-        exportLogsBtn.addEventListener('click', exportLogs);
-
-        pauseLogsBtn.addEventListener('click', () => {
-            logsPaused = !logsPaused;
-            pauseLogsBtn.innerHTML = logsPaused ? '<span>▶️</span> Retomar' : '<span>⏸️</span> Pausar';
-            showToast(logsPaused ? 'Logs pausados' : 'Logs retomados', 'info');
-        });
-
-        // Modal events
         document.querySelector('.close').addEventListener('click', () => {
             scheduleModal.style.display = 'none';
         });
 
-        document.getElementById('saveScheduleBtn').addEventListener('click', saveSchedule);
+        document.getElementById('saveScheduleBtn').addEventListener('click', () => {
+            saveSchedule();
+        });
+
         document.getElementById('cancelScheduleBtn').addEventListener('click', () => {
             scheduleModal.style.display = 'none';
         });
 
-        // Confirmation modal events
-        document.getElementById('confirmYes').addEventListener('click', () => {
-            if (window.confirmCallback) {
-                window.confirmCallback();
-                window.confirmCallback = null;
-            }
-            confirmModal.style.display = 'none';
+        clearLogsBtn.addEventListener('click', () => {
+            logsContainer.innerHTML = '<div class="log-entry log-info">Logs limpos...</div>';
         });
 
-        document.getElementById('confirmNo').addEventListener('click', () => {
-            window.confirmCallback = null;
-            confirmModal.style.display = 'none';
-        });
-
-        // Fechar modals clicando fora
+        // Fechar modal clicando fora
         window.addEventListener('click', (event) => {
             if (event.target === scheduleModal) {
                 scheduleModal.style.display = 'none';
             }
-            if (event.target === confirmModal) {
-                confirmModal.style.display = 'none';
-                window.confirmCallback = null;
-            }
         });
 
-        // Funções melhoradas
-        function updateConnectionStatus(connected) {
+        // Functions
+        function updateStatus(connected) {
             if (connected) {
                 statusIndicator.textContent = 'Conectado';
                 statusIndicator.className = 'status-indicator status-connected';
-                statusIcon.className = 'status-icon connected';
-                statusText.textContent = 'Conectado';
                 connectBtn.disabled = true;
                 disconnectBtn.disabled = false;
-                qrContainer.classList.add('hidden');
             } else {
                 statusIndicator.textContent = 'Desconectado';
                 statusIndicator.className = 'status-indicator status-disconnected';
-                statusIcon.className = 'status-icon disconnected';
-                statusText.textContent = 'Desconectado';
                 connectBtn.disabled = false;
                 disconnectBtn.disabled = true;
+                qrContainer.classList.add('hidden');
             }
-            hideLoading();
         }
 
         function addLog(message, type = 'info') {
-            if (logsPaused) return;
-            
             const timestamp = new Date().toLocaleString('pt-BR');
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry log-${type}`;
@@ -1552,79 +713,16 @@
             logsContainer.appendChild(logEntry);
             logsContainer.scrollTop = logsContainer.scrollHeight;
 
-            // Manter apenas os últimos 200 logs
+            // Manter apenas os últimos 100 logs
             const logs = logsContainer.children;
-            if (logs.length > 200) {
+            if (logs.length > 100) {
                 logsContainer.removeChild(logs[0]);
             }
         }
 
-        function showToast(message, type = 'info') {
-            const toastEl = document.getElementById('toast');
-            const messageEl = document.getElementById('toastMessage');
-            
-            messageEl.textContent = message;
-            toastEl.className = `toast ${type}`;
-            toastEl.classList.remove('hidden');
-            
-            setTimeout(() => {
-                toastEl.classList.add('hidden');
-            }, 3000);
-        }
-
-        function showLoading(message = 'Carregando...') {
-            let overlay = document.querySelector('.loading-overlay');
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.className = 'loading-overlay';
-                overlay.innerHTML = `
-                    <div style="text-align: center; color: white;">
-                        <div class="loading-spinner"></div>
-                        <p style="margin-top: 20px;">${message}</p>
-                    </div>
-                `;
-                document.body.appendChild(overlay);
-            }
-        }
-
-        function hideLoading() {
-            const overlay = document.querySelector('.loading-overlay');
-            if (overlay) {
-                overlay.remove();
-            }
-        }
-
-        function confirmAction(title, message, callback) {
-            document.getElementById('confirmTitle').textContent = title;
-            document.getElementById('confirmMessage').textContent = message;
-            window.confirmCallback = callback;
-            confirmModal.style.display = 'block';
-        }
-
-        function updateSendProgress(progress) {
-            sendProgress.style.width = progress + '%';
-            if (progress === 100) {
-                setTimeout(() => {
-                    sendProgress.style.width = '0%';
-                }, 2000);
-            }
-        }
-
-        function updateStats() {
-            totalGroups.textContent = currentGroups.length;
-            totalSchedules.textContent = currentConfig.schedules ? currentConfig.schedules.filter(s => s.active).length : 0;
-            totalSent.textContent = totalSentMessages;
-        }
-
         function renderGroups(groups) {
             if (groups.length === 0) {
-                groupsList.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #666;">
-                        <span style="font-size: 3em;">👥</span>
-                        <p>Nenhum grupo encontrado</p>
-                        <p><small>Conecte o bot e atualize a lista</small></p>
-                    </div>
-                `;
+                groupsList.innerHTML = '<p>Nenhum grupo encontrado</p>';
                 return;
             }
 
@@ -1632,8 +730,7 @@
                 <div class="group-item">
                     <input type="checkbox" id="group_${group.id}" value="${group.id}">
                     <label for="group_${group.id}">
-                        <strong>${group.name}</strong><br>
-                        <small>👥 ${group.participants} participantes</small>
+                        <strong>${group.name}</strong> (${group.participants} participantes)
                     </label>
                 </div>
             `).join('');
@@ -1643,12 +740,7 @@
 
         function renderModalGroups(groups) {
             if (groups.length === 0) {
-                modalGroupsList.innerHTML = `
-                    <div style="text-align: center; padding: 20px; color: #666;">
-                        <p>Nenhum grupo encontrado</p>
-                        <small>Conecte o bot primeiro</small>
-                    </div>
-                `;
+                modalGroupsList.innerHTML = '<p>Nenhum grupo encontrado</p>';
                 return;
             }
 
@@ -1656,8 +748,7 @@
                 <div class="group-item">
                     <input type="checkbox" id="modalGroup_${group.id}" value="${group.id}">
                     <label for="modalGroup_${group.id}">
-                        <strong>${group.name}</strong><br>
-                        <small>👥 ${group.participants} participantes</small>
+                        <strong>${group.name}</strong> (${group.participants} participantes)
                     </label>
                 </div>
             `).join('');
@@ -1675,33 +766,6 @@
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
-        // Funções para modal de grupos
-        function selectAllModalGroups() {
-            const checkboxes = modalGroupsList.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => cb.checked = true);
-            showToast(`${checkboxes.length} grupos selecionados`, 'info');
-        }
-
-        function deselectAllModalGroups() {
-            const checkboxes = modalGroupsList.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => cb.checked = false);
-            showToast('Todos os grupos desmarcados', 'info');
-        }
-
-        function selectLargeGroups() {
-            const checkboxes = modalGroupsList.querySelectorAll('input[type="checkbox"]');
-            let count = 0;
-            checkboxes.forEach(cb => {
-                const groupId = cb.value;
-                const group = currentGroups.find(g => g.id === groupId);
-                if (group && group.participants >= 50) {
-                    cb.checked = true;
-                    count++;
-                }
-            });
-            showToast(`${count} grupos grandes selecionados`, 'info');
-        }
-
         async function loadConfig() {
             try {
                 const response = await fetch('/api/config');
@@ -1713,18 +777,15 @@
                 // Carregar configurações anti-ban
                 if (currentConfig.antiBanSettings) {
                     document.getElementById('delayBetweenGroups').value = currentConfig.antiBanSettings.delayBetweenGroups || 5;
-                    document.getElementById('delayGroupsValue').textContent = currentConfig.antiBanSettings.delayBetweenGroups || 5;
                     document.getElementById('delayBetweenMessages').value = currentConfig.antiBanSettings.delayBetweenMessages || 2;
-                    document.getElementById('delayMessagesValue').textContent = currentConfig.antiBanSettings.delayBetweenMessages || 2;
                     document.getElementById('maxGroupsPerBatch').value = currentConfig.antiBanSettings.maxGroupsPerBatch || 10;
                     document.getElementById('batchDelay').value = currentConfig.antiBanSettings.batchDelay || 30;
                 }
                 
                 renderSchedules();
-                updateStats();
-                addLog('⚙️ Configurações carregadas', 'info');
+                addLog('Configurações carregadas', 'info');
             } catch (error) {
-                addLog('❌ Erro ao carregar configurações: ' + error.message, 'error');
+                addLog('Erro ao carregar configurações: ' + error.message, 'error');
             }
         }
 
@@ -1746,36 +807,12 @@
                 
                 if (result.success) {
                     currentConfig = config;
-                    addLog('💾 Configurações salvas com sucesso', 'success');
-                    showToast('Configurações salvas!', 'success');
+                    addLog('Configurações salvas com sucesso', 'success');
                 } else {
-                    addLog('❌ Erro ao salvar configurações', 'error');
-                    showToast('Erro ao salvar configurações', 'error');
+                    addLog('Erro ao salvar configurações', 'error');
                 }
             } catch (error) {
-                addLog('❌ Erro ao salvar configurações: ' + error.message, 'error');
-                showToast('Erro ao salvar configurações', 'error');
-            }
-        }
-
-        async function testYouTubeConnection() {
-            if (!youtubeApiKey.value || !channelId.value) {
-                showToast('Preencha a API Key e ID do canal primeiro', 'warning');
-                return;
-            }
-
-            showLoading('Testando conexão...');
-            
-            try {
-                // Simular teste de conexão
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                addLog('✅ Conexão com YouTube testada com sucesso', 'success');
-                showToast('Conexão com YouTube OK!', 'success');
-            } catch (error) {
-                addLog('❌ Erro ao testar conexão com YouTube', 'error');
-                showToast('Erro na conexão com YouTube', 'error');
-            } finally {
-                hideLoading();
+                addLog('Erro ao salvar configurações: ' + error.message, 'error');
             }
         }
 
@@ -1803,27 +840,21 @@
                 
                 if (result.success) {
                     currentConfig = config;
-                    addLog('🛡️ Configurações anti-banimento salvas', 'success');
-                    showToast('Proteções salvas!', 'success');
+                    addLog('Configurações anti-banimento salvas', 'success');
                 } else {
-                    addLog('❌ Erro ao salvar configurações anti-banimento', 'error');
-                    showToast('Erro ao salvar proteções', 'error');
+                    addLog('Erro ao salvar configurações anti-banimento', 'error');
                 }
             } catch (error) {
-                addLog('❌ Erro ao salvar configurações: ' + error.message, 'error');
-                showToast('Erro ao salvar', 'error');
+                addLog('Erro ao salvar configurações: ' + error.message, 'error');
             }
         }
 
         function saveSchedule() {
             const name = document.getElementById('scheduleName').value;
-            const description = document.getElementById('scheduleDescription').value;
             const time = document.getElementById('scheduleTime').value;
-            const timezone = document.getElementById('scheduleTimezone').value;
-            const repeatDays = parseInt(document.getElementById('scheduleRepeatDays').value);
             
             if (!name || !time) {
-                showToast('Preencha nome e horário do agendamento', 'warning');
+                addLog('Preencha nome e horário do agendamento', 'warning');
                 return;
             }
 
@@ -1835,13 +866,13 @@
             }
 
             if (selectedDays.length === 0) {
-                showToast('Selecione pelo menos um dia da semana', 'warning');
+                addLog('Selecione pelo menos um dia da semana', 'warning');
                 return;
             }
 
             const selectedGroups = getModalSelectedGroups();
             if (selectedGroups.length === 0) {
-                showToast('Selecione pelo menos um grupo para este agendamento', 'warning');
+                addLog('Selecione pelo menos um grupo para este agendamento', 'warning');
                 return;
             }
 
@@ -1850,22 +881,12 @@
             const schedule = {
                 id: editingScheduleId || Date.now(),
                 name,
-                description,
                 hour: parseInt(hour),
                 minute: parseInt(minute),
-                timezone,
-                repeatDays,
                 days: selectedDays,
                 selectedGroups: selectedGroups,
                 active: true,
-                createdAt: editingScheduleId ? undefined : new Date().toISOString(),
-                filters: {
-                    onlyActiveGroups: document.getElementById('onlyActiveGroups').checked,
-                    minParticipants: document.getElementById('minParticipants').checked,
-                    minParticipantsCount: parseInt(document.getElementById('minParticipantsCount').value),
-                    excludeKeywords: document.getElementById('excludeKeywords').checked,
-                    excludeKeywordsList: document.getElementById('excludeKeywordsList').value
-                }
+                createdAt: editingScheduleId ? undefined : new Date().toISOString()
             };
 
             if (!currentConfig.schedules) {
@@ -1877,14 +898,12 @@
                 const index = currentConfig.schedules.findIndex(s => s.id === editingScheduleId);
                 if (index !== -1) {
                     currentConfig.schedules[index] = { ...currentConfig.schedules[index], ...schedule };
-                    addLog(`📅 Agendamento "${name}" atualizado`, 'success');
-                    showToast('Agendamento atualizado!', 'success');
+                    addLog(`Agendamento "${name}" atualizado`, 'success');
                 }
             } else {
                 // Novo agendamento
                 currentConfig.schedules.push(schedule);
-                addLog(`📅 Agendamento "${name}" criado`, 'success');
-                showToast('Agendamento criado!', 'success');
+                addLog(`Agendamento "${name}" criado`, 'success');
             }
 
             saveSchedules();
@@ -1900,24 +919,12 @@
             
             // Preencher formulário
             document.getElementById('scheduleName').value = schedule.name;
-            document.getElementById('scheduleDescription').value = schedule.description || '';
             document.getElementById('scheduleTime').value = 
                 `${schedule.hour.toString().padStart(2, '0')}:${schedule.minute.toString().padStart(2, '0')}`;
-            document.getElementById('scheduleTimezone').value = schedule.timezone || 'America/Sao_Paulo';
-            document.getElementById('scheduleRepeatDays').value = schedule.repeatDays || 0;
             
             // Marcar dias
             for (let i = 0; i <= 6; i++) {
                 document.getElementById(`modalDay${i}`).checked = schedule.days.includes(i);
-            }
-            
-            // Preencher filtros se existirem
-            if (schedule.filters) {
-                document.getElementById('onlyActiveGroups').checked = schedule.filters.onlyActiveGroups || false;
-                document.getElementById('minParticipants').checked = schedule.filters.minParticipants || false;
-                document.getElementById('minParticipantsCount').value = schedule.filters.minParticipantsCount || 10;
-                document.getElementById('excludeKeywords').checked = schedule.filters.excludeKeywords || false;
-                document.getElementById('excludeKeywordsList').value = schedule.filters.excludeKeywordsList || '';
             }
             
             // Renderizar grupos e marcar selecionados
@@ -1937,13 +944,12 @@
         }
 
         function removeSchedule(id) {
-            confirmAction('Remover Agendamento', 'Tem certeza que deseja remover este agendamento?', () => {
+            if (confirm('Tem certeza que deseja remover este agendamento?')) {
                 currentConfig.schedules = currentConfig.schedules.filter(s => s.id !== id);
                 saveSchedules();
                 renderSchedules();
-                addLog('🗑️ Agendamento removido', 'info');
-                showToast('Agendamento removido!', 'info');
-            });
+                addLog('Agendamento removido', 'info');
+            }
         }
 
         function toggleSchedule(id) {
@@ -1952,9 +958,7 @@
                 schedule.active = !schedule.active;
                 saveSchedules();
                 renderSchedules();
-                const status = schedule.active ? 'ativado' : 'desativado';
-                addLog(`📅 Agendamento ${status}`, 'info');
-                showToast(`Agendamento ${status}!`, 'info');
+                addLog(`Agendamento ${schedule.active ? 'ativado' : 'desativado'}`, 'info');
             }
         }
 
@@ -1967,25 +971,17 @@
                 });
 
                 const result = await response.json();
-                if (result.success) {
-                    updateStats();
-                } else {
-                    addLog('❌ Erro ao salvar agendamentos', 'error');
+                if (!result.success) {
+                    addLog('Erro ao salvar agendamentos', 'error');
                 }
             } catch (error) {
-                addLog('❌ Erro ao salvar agendamentos: ' + error.message, 'error');
+                addLog('Erro ao salvar agendamentos: ' + error.message, 'error');
             }
         }
 
         function renderSchedules() {
             if (!currentConfig.schedules || currentConfig.schedules.length === 0) {
-                schedulesList.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #666;">
-                        <span style="font-size: 3em;">📅</span>
-                        <p>Nenhum agendamento configurado ainda</p>
-                        <p><small>Clique em "Novo Agendamento" para começar</small></p>
-                    </div>
-                `;
+                schedulesList.innerHTML = '<p>Nenhum agendamento configurado</p>';
                 return;
             }
 
@@ -1995,30 +991,21 @@
                 const daysText = schedule.days.map(d => dayNames[d]).join(', ');
                 const timeText = `${schedule.hour.toString().padStart(2, '0')}:${schedule.minute.toString().padStart(2, '0')}`;
                 const groupsCount = schedule.selectedGroups ? schedule.selectedGroups.length : 0;
-                const statusIcon = schedule.active ? '✅' : '⏸️';
-                const statusClass = schedule.active ? 'active' : '';
                 
                 return `
-                    <div class="schedule-item ${statusClass}">
+                    <div class="schedule-item ${schedule.active ? 'active' : ''}">
                         <div class="schedule-header">
                             <div class="schedule-info">
-                                <h3>${statusIcon} ${schedule.name}</h3>
-                                ${schedule.description ? `<small>📝 ${schedule.description}</small>` : ''}
-                                <small>🕐 ${timeText} - 📅 ${daysText}</small>
+                                <strong>${schedule.name}</strong><br>
+                                <small>🕐 ${timeText} - 📅 ${daysText}</small><br>
                                 <small>👥 ${groupsCount} grupos selecionados</small>
-                                ${schedule.timezone && schedule.timezone !== 'America/Sao_Paulo' ? `<small>🌍 ${schedule.timezone}</small>` : ''}
-                                ${schedule.repeatDays > 0 ? `<small>🔄 Repetir por ${schedule.repeatDays} dias</small>` : ''}
                             </div>
                             <div class="schedule-actions">
-                                <button class="btn btn-small" onclick="editSchedule(${schedule.id})">
-                                    <span>✏️</span> Editar
+                                <button class="btn btn-small" onclick="editSchedule(${schedule.id})">✏️ Editar</button>
+                                <button class="btn btn-small ${schedule.active ? 'btn-danger' : 'btn-success'}" onclick="toggleSchedule(${schedule.id})">
+                                    ${schedule.active ? '⏸️ Pausar' : '▶️ Ativar'}
                                 </button>
-                                <button class="btn btn-small ${schedule.active ? 'btn-warning' : 'btn-success'}" onclick="toggleSchedule(${schedule.id})">
-                                    <span>${schedule.active ? '⏸️' : '▶️'}</span> ${schedule.active ? 'Pausar' : 'Ativar'}
-                                </button>
-                                <button class="btn btn-small btn-danger" onclick="removeSchedule(${schedule.id})">
-                                    <span>🗑️</span> Remover
-                                </button>
+                                <button class="btn btn-small btn-danger" onclick="removeSchedule(${schedule.id})">🗑️ Remover</button>
                             </div>
                         </div>
                     </div>
@@ -2030,134 +1017,25 @@
 
         function clearScheduleForm() {
             document.getElementById('scheduleName').value = '';
-            document.getElementById('scheduleDescription').value = '';
             document.getElementById('scheduleTime').value = '';
-            document.getElementById('scheduleTimezone').value = 'America/Sao_Paulo';
-            document.getElementById('scheduleRepeatDays').value = 0;
-            
             for (let i = 0; i <= 6; i++) {
                 const checkbox = document.getElementById(`modalDay${i}`);
                 if (checkbox) checkbox.checked = false;
             }
-            
-            // Limpar filtros
-            document.getElementById('onlyActiveGroups').checked = false;
-            document.getElementById('minParticipants').checked = false;
-            document.getElementById('minParticipantsCount').value = 10;
-            document.getElementById('excludeKeywords').checked = false;
-            document.getElementById('excludeKeywordsList').value = '';
             
             // Limpar grupos selecionados
             const groupCheckboxes = modalGroupsList.querySelectorAll('input[type="checkbox"]');
             groupCheckboxes.forEach(cb => cb.checked = false);
         }
 
-        function exportSchedules() {
-            if (!currentConfig.schedules || currentConfig.schedules.length === 0) {
-                showToast('Nenhum agendamento para exportar', 'warning');
-                return;
-            }
-
-            const dataStr = JSON.stringify(currentConfig.schedules, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `agendamentos-auto-disparador-${new Date().toISOString().split('T')[0]}.json`;
-            link.click();
-            URL.revokeObjectURL(url);
-            
-            addLog('📤 Agendamentos exportados', 'success');
-            showToast('Agendamentos exportados!', 'success');
-        }
-
-        function importSchedules() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const schedules = JSON.parse(e.target.result);
-                        if (Array.isArray(schedules)) {
-                            if (!currentConfig.schedules) {
-                                currentConfig.schedules = [];
-                            }
-                            
-                            // Adicionar IDs únicos para evitar conflitos
-                            schedules.forEach(schedule => {
-                                schedule.id = Date.now() + Math.random();
-                                currentConfig.schedules.push(schedule);
-                            });
-                            
-                            saveSchedules();
-                            renderSchedules();
-                            addLog(`📥 ${schedules.length} agendamentos importados`, 'success');
-                            showToast('Agendamentos importados!', 'success');
-                        } else {
-                            throw new Error('Formato inválido');
-                        }
-                    } catch (error) {
-                        addLog('❌ Erro ao importar agendamentos: arquivo inválido', 'error');
-                        showToast('Erro no arquivo importado', 'error');
-                    }
-                };
-                reader.readAsText(file);
-            };
-            input.click();
-        }
-
-        function exportLogs() {
-            const logs = Array.from(logsContainer.children).map(log => log.textContent).join('\n');
-            const dataBlob = new Blob([logs], {type: 'text/plain'});
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `logs-auto-disparador-${new Date().toISOString().split('T')[0]}.txt`;
-            link.click();
-            URL.revokeObjectURL(url);
-            
-            showToast('Logs exportados!', 'success');
-        }
-
         // Tornar funções globais para onclick
         window.toggleSchedule = toggleSchedule;
         window.removeSchedule = removeSchedule;
         window.editSchedule = editSchedule;
-        window.selectAllModalGroups = selectAllModalGroups;
-        window.deselectAllModalGroups = deselectAllModalGroups;
-        window.selectLargeGroups = selectLargeGroups;
 
         // Inicializar
-        updateConnectionStatus(false);
-        addLog('🎯 Interface Auto Disparador carregada - conecte o bot para começar', 'info');
-        
-        // Verificar se há atualizações (simulado)
-        setTimeout(() => {
-            addLog('✅ Verificação de atualizações concluída - versão mais recente instalada', 'success');
-        }, 2000);
-
-        // Função para mostrar informações do sistema
-        function showSystemInfo() {
-            addLog('📊 === INFORMAÇÕES DO SISTEMA ===', 'info');
-            addLog('🏷️  Nome: Auto Disparador', 'info');
-            addLog('📅 Versão: 2025.1.0', 'info');
-            addLog('🌟 Status: Ativo e funcionando', 'success');
-        }
-
-        // Mostrar info do sistema ao carregar
-        setTimeout(showSystemInfo, 3000);
-        
-        // Função para créditos no console
-        setTimeout(() => {
-            console.log('%c🚀 Auto Disparador', 'color: #667eea; font-size: 24px; font-weight: bold;');
-            console.log('%cDesenvolvido por Wallysson Studio Dv 2025', 'color: #764ba2; font-size: 16px;');
-            console.log('%c💜 "Você sonha, Deus realiza"', 'color: #27ae60; font-size: 14px; font-style: italic;');
-        }, 1000);
+        updateStatus(false);
+        addLog('Interface carregada - conecte o bot para começar', 'info');
     </script>
 </body>
 </html>
